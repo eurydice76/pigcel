@@ -3,6 +3,7 @@
 """
 
 import collections
+import glob
 import logging
 import os
 import sys
@@ -13,9 +14,11 @@ import pigcel
 from pigcel.__pkginfo__ import __version__
 from pigcel.gui.models.animals_data_model import AnimalsDataModel
 from pigcel.gui.models.workbook_data_model import WorkbookDataModel
+from pigcel.gui.views.animals_data_listview import AnimalsDataListView
 from pigcel.gui.views.copy_pastable_tableview import CopyPastableTableView
-from pigcel.gui.views.double_clickable_listview import DoubleClickableListView
 from pigcel.gui.widgets.logger_widget import QTextEditLogger
+from pigcel.gui.widgets.groups_widget import GroupsWidget
+from pigcel.gui.widgets.multiple_directories_selector import MultipleDirectoriesSelector
 from pigcel.gui.widgets.plots_widget import PlotsWidget
 from pigcel.kernel.readers.excel_reader import ExcelWorkbookReader
 from pigcel.kernel.utils.progress_bar import progress_bar
@@ -24,6 +27,16 @@ from pigcel.kernel.utils.progress_bar import progress_bar
 class MainWindow(QtWidgets.QMainWindow):
     """This class implements the main window of the monitoring application.
     """
+
+    add_new_group = QtCore.pyqtSignal(str)
+
+    display_group_averages = QtCore.pyqtSignal()
+
+    display_group_medians = QtCore.pyqtSignal()
+
+    export_group_statistics = QtCore.pyqtSignal()
+
+    import_groups_from_directories = QtCore.pyqtSignal(dict)
 
     update_property_plot = QtCore.pyqtSignal(tuple)
 
@@ -44,7 +57,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """Build the signal/slots.
         """
 
-        self._workbooks_list.double_clicked_empty.connect(self.on_load_monitoring_file)
+        self._animals_list.double_clicked_empty.connect(self.on_load_monitoring_file)
         self._selected_property_combo.currentTextChanged.connect(self.on_update_property_plot)
         self._selected_property_combo.currentTextChanged.connect(self.on_update_time_plot)
         self._selected_time_combo.currentTextChanged.connect(self.on_update_time_plot)
@@ -58,7 +71,7 @@ class MainWindow(QtWidgets.QMainWindow):
         hlayout = QtWidgets.QHBoxLayout()
 
         vlayout = QtWidgets.QVBoxLayout()
-        vlayout.addWidget(self._workbooks_list)
+        vlayout.addWidget(self._animals_list)
 
         property_layout = QtWidgets.QHBoxLayout()
         property_layout.addWidget(self._selected_property_label)
@@ -104,20 +117,53 @@ class MainWindow(QtWidgets.QMainWindow):
         exit_action.triggered.connect(self.on_quit_application)
         file_menu.addAction(exit_action)
 
+        group_menu = menubar.addMenu('&Groups')
+        add_group_action = QtWidgets.QAction('&Add group', self)
+        add_group_action.setShortcut('Ctrl+R')
+        add_group_action.setStatusTip('Add new group')
+        add_group_action.triggered.connect(self.on_add_new_group)
+        group_menu.addAction(add_group_action)
+
+        import_groups_action = QtWidgets.QAction('&Import from directories', self)
+        import_groups_action.setShortcut('Ctrl+U')
+        import_groups_action.setStatusTip('Import and create groups from a list of directories')
+        import_groups_action.triggered.connect(self.on_import_groups_from_directories)
+        group_menu.addAction(import_groups_action)
+
+        group_menu.addSeparator()
+
+        display_group_averages_action = QtWidgets.QAction('&Display averages', self)
+        display_group_averages_action.setShortcut('Ctrl+D')
+        display_group_averages_action.setStatusTip('Display averages and std for each group')
+        display_group_averages_action.triggered.connect(self.on_display_group_averages)
+        group_menu.addAction(display_group_averages_action)
+
+        display_group_medians_action = QtWidgets.QAction('Display &medians', self)
+        display_group_medians_action.setShortcut('Ctrl+M')
+        display_group_medians_action.setStatusTip('Display averages and std for each group')
+        display_group_medians_action.triggered.connect(self.on_display_group_medians)
+        group_menu.addAction(display_group_medians_action)
+
+        export_group_statistics = QtWidgets.QAction('&Export descriptive statistics', self)
+        export_group_statistics.setShortcut('Ctrl+E')
+        export_group_statistics.setStatusTip('Export descriptive statistics (average, std, quartile ...)')
+        export_group_statistics.triggered.connect(self.on_export_group_statistics)
+        group_menu.addAction(export_group_statistics)
+
     def build_widgets(self):
         """Build the widgets.
         """
 
         self._main_frame = QtWidgets.QFrame(self)
 
-        self._workbooks_list = DoubleClickableListView()
-        self._workbooks_list.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self._animals_list = AnimalsDataListView()
+        self._animals_list.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self._animals_list.setDragEnabled(True)
+        self._animals_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self._animals_list.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
-        self._workbooks_list.setDragEnabled(True)
-        workbooks_model = AnimalsDataModel(self)
-        self._workbooks_list.setModel(workbooks_model)
-        self._workbooks_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self._workbooks_list.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        animals_model = AnimalsDataModel(self)
+        self._animals_list.setModel(animals_model)
 
         self._selected_property_label = QtWidgets.QLabel('Property')
         self._selected_property_combo = QtWidgets.QComboBox()
@@ -137,9 +183,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._tabs = QtWidgets.QTabWidget()
 
-        self._monitoring_plots_widget = PlotsWidget(self)
+        self._plots_widget = PlotsWidget(self)
+        self._groups_widget = GroupsWidget(animals_model, self)
 
-        self._tabs.addTab(self._monitoring_plots_widget, 'Plots')
+        self._tabs.addTab(self._plots_widget, 'Plots')
+        self._tabs.addTab(self._groups_widget, 'Groups')
 
         self.setCentralWidget(self._main_frame)
 
@@ -171,6 +219,84 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.build_events()
 
+    def on_add_new_group(self):
+        """Event fired when the user clicks on 'Add group' menu button.
+        """
+
+        group, ok = QtWidgets.QInputDialog.getText(self, 'Enter group name', 'Group name', QtWidgets.QLineEdit.Normal, 'group')
+
+        if ok and group:
+            self.add_new_group.emit(group)
+
+    def on_display_group_averages(self):
+        """Event fired when the user clicks on 'Display group averages plot' menu button.
+        """
+
+        self.display_group_averages.emit()
+
+    def on_display_group_medians(self):
+        """Event fired when the user clicks on 'Display group medians plot' menu button.
+        """
+
+        self.display_group_medians.emit()
+
+    def on_export_group_statistics(self):
+        """Event fired when the user clicks on the 'Export statistics' menu button.
+        """
+
+        self.export_group_statistics.emit()
+
+    def on_import_groups_from_directories(self):
+        """Event fired when the user clicks on Groups -> Import from directories menu button.
+        """
+
+        # Pop up a file browser
+        selector = MultipleDirectoriesSelector()
+        if not selector.exec_():
+            return
+
+        experimental_dirs = selector.selectedFiles()
+        if not experimental_dirs:
+            return
+
+        animals_data_model = self._animals_list.model()
+
+        progress_bar.reset(len(experimental_dirs))
+
+        n_loaded_dirs = 0
+
+        groups = collections.OrderedDict()
+
+        # Loop over the pig directories
+        for progress, exp_dir in enumerate(experimental_dirs):
+
+            data_files = glob.glob(os.path.join(exp_dir, '*.xls[x]'))
+
+            # Loop over the Data*csv csv files found in the current oig directory
+            for data_file in data_files:
+                try:
+                    reader = ExcelWorkbookReader(data_file)
+                except Exception as error:
+                    logging.error(str(error))
+                    continue
+                else:
+                    animals_data_model.add_workbook(reader)
+                    groups.setdefault(os.path.basename(exp_dir), []).append(data_file)
+                    self._selected_property_combo.clear()
+                    self._selected_property_combo.addItems(reader.properties)
+
+            n_loaded_dirs += 1
+            progress_bar.update(progress+1)
+
+        # Create a signal/slot connexion for row changed event
+        self._animals_list.selectionModel().selectionChanged.connect(self.on_select_animal)
+
+        self._animals_list.setCurrentIndex(animals_data_model.index(0, 0))
+
+        self.import_groups_from_directories.emit(groups)
+
+        logging.info('Imported successfully {} groups out of {} directories'.format(n_loaded_dirs, len(experimental_dirs)))
+
     def on_load_monitoring_file(self):
         """Event called when the user clicks on 'Load monitoring file' menu button.
         """
@@ -180,7 +306,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if not xlsx_files:
             return
 
-        workbooks_model = self._workbooks_list.model()
+        workbooks_model = self._animals_list.model()
 
         n_xlsx_files = len(xlsx_files)
         progress_bar.reset(n_xlsx_files)
@@ -205,9 +331,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 progress_bar.update(progress+1)
 
         # Create a signal/slot connexion for row changed event
-        self._workbooks_list.selectionModel().selectionChanged.connect(self.on_select_workbook)
+        self._animals_list.selectionModel().selectionChanged.connect(self.on_select_animal)
 
-        self._workbooks_list.setCurrentIndex(workbooks_model.index(0, 0))
+        self._animals_list.setCurrentIndex(workbooks_model.index(0, 0))
 
         logging.info('Loaded successfully {} files out of {}'.format(n_loaded_files, n_xlsx_files))
 
@@ -227,18 +353,18 @@ class MainWindow(QtWidgets.QMainWindow):
         if not selected_property:
             return
 
-        selected_indexes = self._workbooks_list.selectionModel().selectedIndexes()
+        selected_indexes = self._animals_list.selectionModel().selectedIndexes()
         if not selected_indexes:
             return
 
-        workbooks_model = self._workbooks_list.model()
+        workbooks_model = self._animals_list.model()
 
         selected_workbooks = [workbooks_model.data(index, AnimalsDataModel.Workbook) for index in selected_indexes]
 
         selected_data = []
         for wb in selected_workbooks:
-            wb_data = wb.get_data(selected_property=selected_property)
-            selected_data.append((wb.basename, wb_data[selected_property]))
+            wb_data = wb.get_property_slice(selected_property)
+            selected_data.append((wb.basename, wb_data))
 
         selected_data = (selected_property, selected_data)
         self.update_property_plot.emit(selected_data)
@@ -255,27 +381,27 @@ class MainWindow(QtWidgets.QMainWindow):
         if not selected_time:
             return
 
-        selected_indexes = self._workbooks_list.selectionModel().selectedIndexes()
+        selected_indexes = self._animals_list.selectionModel().selectedIndexes()
         if not selected_indexes:
             return
 
-        workbooks_model = self._workbooks_list.model()
+        workbooks_model = self._animals_list.model()
 
         selected_workbooks = [workbooks_model.data(index, AnimalsDataModel.Workbook) for index in selected_indexes]
 
         selected_data = []
         for wb in selected_workbooks:
-            wb_data = wb.get_data(selected_property=selected_property, selected_time=selected_time)
-            selected_data.append((wb.basename, wb_data[selected_property]))
+            wb_data = wb.get_time_slice(selected_time)[selected_property]
+            selected_data.append((wb.basename, wb_data))
         selected_data = (selected_property, selected_time, selected_data)
 
         self.update_time_plot.emit(selected_data)
 
-    def on_select_workbook(self, index):
-        """Event fired when a workbook is selected.
+    def on_select_animal(self, index):
+        """Event fired when an animal is selected.
 
         Args:
-            index (PyQt5.QtCore.QModelIndex): the index of the workbook in the corresponding list view
+            index (PyQt5.QtCore.QModelIndex): the index of the animal in the corresponding list view
         """
 
         selected_indexes = index.indexes()
@@ -283,7 +409,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if not selected_indexes:
             return
 
-        data = self._workbooks_list.model().data(selected_indexes[0], AnimalsDataModel.Workbook).get_data()
+        data = self._animals_list.model().data(selected_indexes[0], AnimalsDataModel.Workbook).get_data()
 
         workbook_data_model = WorkbookDataModel(data)
 
@@ -292,3 +418,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.on_update_property_plot()
 
         self.on_update_time_plot()
+
+    @property
+    def selected_property(self):
+
+        return self._selected_property_combo.currentText()

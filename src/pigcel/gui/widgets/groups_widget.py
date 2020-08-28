@@ -1,8 +1,13 @@
 import logging
+import os
 
-from PyQt5 import QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 
+from pigcel.gui.dialogs.group_averages_dialog import GroupAveragesDialog
+from pigcel.gui.dialogs.group_medians_dialog import GroupMediansDialog
+from pigcel.gui.models.animals_pool_model import AnimalsPoolModel
 from pigcel.gui.models.animals_groups_model import AnimalsGroupsModel
+from pigcel.gui.views.animals_groups_listview import AnimalsGroupsListView
 from pigcel.gui.views.animals_pool_listview import AnimalsPoolListView
 
 
@@ -29,6 +34,14 @@ class GroupsWidget(QtWidgets.QWidget):
         """Build the signal/slots
         """
 
+        self._groups_list.double_clicked_empty.connect(self._main_window.on_add_new_group)
+        self._groups_list.selectionModel().currentChanged.connect(self.on_select_group)
+        self._main_window.add_new_group.connect(self.on_add_group)
+        self._main_window.display_group_averages.connect(self.on_display_group_averages)
+        self._main_window.display_group_medians.connect(self.on_display_group_medians)
+        self._main_window.export_group_statistics.connect(self.on_export_group_statistics)
+        self._main_window.import_groups_from_directories.connect(self.on_import_groups)
+
     def build_layout(self):
         """Build the layout.
         """
@@ -37,9 +50,10 @@ class GroupsWidget(QtWidgets.QWidget):
 
         hlayout = QtWidgets.QHBoxLayout()
 
-        hlayout.addWidget(self._groups_list)
-        hlayout.addWidget(self._individuals_list)
-        self._groups_groupbox.setLayout(hlayout)
+        groupbox_laout = QtWidgets.QHBoxLayout()
+        groupbox_laout.addWidget(self._groups_list)
+        groupbox_laout.addWidget(self._animals_list)
+        self._groups_groupbox.setLayout(groupbox_laout)
 
         hlayout.addWidget(self._groups_groupbox)
 
@@ -51,7 +65,7 @@ class GroupsWidget(QtWidgets.QWidget):
         """Build the widgets.
         """
 
-        self._groups_list = QtWidgets.QListView(self)
+        self._groups_list = AnimalsGroupsListView(self)
         self._groups_list.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._groups_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         groups_model = AnimalsGroupsModel(self)
@@ -78,9 +92,101 @@ class GroupsWidget(QtWidgets.QWidget):
         """
 
         groups_model = self._groups_list.model()
-        groups_model.add_group(group)
+        animals_model = AnimalsPoolModel(self._animals_model)
+        groups_model.add_model(group, animals_model)
         last_index = groups_model.index(groups_model.rowCount()-1, 0)
         self._groups_list.setCurrentIndex(last_index)
+
+    def on_display_group_averages(self):
+        """Display the group averages.
+        """
+
+        # No animals loaded, return
+        n_animals = self._animals_model.rowCount()
+        if n_animals == 0:
+            logging.warning('No animal loaded yet')
+            return
+
+        # No group defined, return
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No group defined yet')
+            return
+
+        selected_property = self._main_window.selected_property
+
+        reduced_data_per_group = groups_model.get_reduced_data_per_group(selected_property, selected_statistics=['mean', 'std'])
+        if not reduced_data_per_group:
+            return
+
+        dialog = GroupAveragesDialog(self._main_window.selected_property, reduced_data_per_group, self)
+        dialog.show()
+
+    def on_display_group_medians(self):
+        """Display the group medians.
+        """
+
+        # No animals loaded, return
+        n_animals = self._animals_model.rowCount()
+        if n_animals == 0:
+            logging.warning('No animal loaded yet')
+            return
+
+        # No group defined, return
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No group defined yet')
+            return
+
+        selected_property = self._main_window.selected_property
+
+        data_per_group = groups_model.get_data_per_group(selected_property)
+        if not data_per_group:
+            return
+
+        dialog = GroupMediansDialog(self._main_window.selected_property, data_per_group, self)
+        dialog.show()
+
+    def on_export_group_statistics(self):
+        """Event fired when the user clicks on the 'Export statistics' menu button.
+        """
+
+        # No animals loaded, return
+        n_animals = self._animals_model.rowCount()
+        if n_animals == 0:
+            logging.warning('No animal loaded yet')
+            return
+
+        # No group defined, return
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No group defined yet')
+            return
+
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption='Export statistics as ...', filter="Excel files (*.xls *.xlsx)")
+        if not filename:
+            return
+
+        filename_noext, ext = os.path.splitext(filename)
+        if ext not in ['.xls', '.xlsx']:
+            logging.warning('Bad file extension for output excel file {}. It will be replaced by ".xlsx"'.format(filename))
+            filename = filename_noext + '.xlsx'
+
+        groups_model.export_statistics(filename, selected_property=self._main_window.selected_property)
+
+    def on_import_groups(self, groups):
+        """Event fired when the user click on Groups -> Import from directories menu button.
+
+        Args:
+            groups (collections.OrderedDict): the imported groups
+        """
+
+        for group, files in groups.items():
+            self.on_add_group(group)
+            for filename in files:
+                animals_pool_model = self._groups_list.model().get_animals_pool_model(group)
+                if animals_pool_model is not None:
+                    animals_pool_model.add_animal(filename)
 
     def on_select_group(self, index):
         """Updates the individuals list view.
@@ -91,8 +197,8 @@ class GroupsWidget(QtWidgets.QWidget):
 
         groups_model = self._groups_list.model()
 
-        current_pig_pool = groups_model.data(index, groups_model.PigsPool)
+        animals_pool_model = groups_model.data(index, groups_model.AnimalsPoolModel)
+        if animals_pool_model == QtCore.QVariant():
+            return
 
-        pigs_pool_model = PigsPoolModel(self, current_pig_pool)
-
-        self._individuals_list.setModel(pigs_pool_model)
+        self._animals_list.setModel(animals_pool_model)

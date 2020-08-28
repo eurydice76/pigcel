@@ -114,7 +114,7 @@ class PlotsWidget(QtWidgets.QWidget):
 
         animals = [v[0] for v in data_per_animal]
 
-        all_animals_values = [v[1][0] for v in data_per_animal]
+        all_animals_values = [v[1] for v in data_per_animal]
 
         self._time_plot_axes.clear()
         self._time_plot_axes.set_xlabel('Animal')

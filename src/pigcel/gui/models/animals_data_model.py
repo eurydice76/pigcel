@@ -71,6 +71,44 @@ class AnimalsDataModel(QtCore.QAbstractListModel):
 
             return QtCore.QVariant()
 
+    def flags(self, index):
+        if index.isValid():
+            return QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
+
+    def get_workbook(self, filename):
+        """Retrieve the workbook with a given filename.
+
+        Args:
+            filename (str): the workbook's filename
+
+        Returns:
+            openpyxl.workbook.workbook.Workbook: the workbook
+        """
+
+        for wb in self._workbooks:
+            if wb.filename == filename:
+                return wb
+
+        return None
+
+    def remove_workbook(self, workbook):
+        """Remove a workbook from the model.
+
+        Args:
+            workbook (openpyxl.workbook.workbook.Workbook): the workbook
+        """
+
+        if workbook not in self._workbooks:
+            return
+
+        index = self._workbooks.index(workbook)
+
+        self.beginRemoveRows(QtCore.QModelIndex(), index, index)
+
+        self._workbooks.remove(workbook)
+
+        self.endRemoveRows()
+
     def rowCount(self, parent=QtCore.QModelIndex()):
         """Returns the number of rows.
 

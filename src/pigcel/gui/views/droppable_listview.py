@@ -35,16 +35,3 @@ class DroppableListView(QtWidgets.QListView):
     def dropEvent(self, event):
         """Event triggered when the dragged item is dropped into this widget.
         """
-
-    def keyPressEvent(self, event):
-
-        if event.key() == QtCore.Qt.Key_Delete:
-
-            for sel_index in reversed(self.selectedIndexes()):
-                self.model().remove_reader(sel_index.data(QtCore.Qt.DisplayRole))
-                if self.model().rowCount() > 0:
-                    index = self.model().index(self.model().rowCount()-1)
-                    self.setCurrentIndex(index)
-
-        else:
-            super(PigsPoolListView, self).keyPressEvent(event)

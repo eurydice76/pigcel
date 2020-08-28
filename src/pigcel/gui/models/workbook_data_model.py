@@ -39,7 +39,7 @@ class WorkbookDataModel(QtCore.QAbstractTableModel):
             int: the number of columns
         """
 
-        return len(self._data)
+        return len(self._data.columns)
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
         """Return the data for a given index and for a given role.
