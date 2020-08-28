@@ -193,12 +193,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setGeometry(0, 0, 1200, 1100)
 
-        self.setWindowTitle("monitorpig {}".format(__version__))
+        self.setWindowTitle('pigcel {}'.format(__version__))
 
         self._progress_label = QtWidgets.QLabel('Progress')
         self._progress_bar = QtWidgets.QProgressBar()
         progress_bar.set_progress_widget(self._progress_bar)
-        self.statusBar().showMessage("monitorpig {}".format(__version__))
+        self.statusBar().showMessage('pigcel {}'.format(__version__))
         self.statusBar().addPermanentWidget(self._progress_label)
         self.statusBar().addPermanentWidget(self._progress_bar)
 
