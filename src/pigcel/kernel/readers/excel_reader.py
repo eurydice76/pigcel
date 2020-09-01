@@ -165,9 +165,8 @@ class ExcelWorkbookReader:
 
         cells = list(zip(*cells))
 
-        data = pd.DataFrame([[cell.value if cell.value is not None else np.nan for cell in row] for row in cells])
-        data.columns = properties
-        data.set_index(pd.Series(ExcelWorkbookReader.times), inplace=True)
+        data = pd.DataFrame([[cell.value if cell.value is not None else np.nan for cell in row]
+                             for row in cells], columns=properties, index=ExcelWorkbookReader.times)
 
         return data
 
@@ -184,9 +183,8 @@ class ExcelWorkbookReader:
 
         cells = data_sheet['C7':'U18']
 
-        data = pd.DataFrame([[cell.value if cell.value is not None else np.nan for cell in row] for row in cells])
-        data.columns = properties
-        data.set_index(pd.Series(ExcelWorkbookReader.times), inplace=True)
+        data = pd.DataFrame([[cell.value if cell.value is not None else np.nan for cell in row]
+                             for row in cells], columns=properties, index=ExcelWorkbookReader.times)
 
         return data
 
@@ -209,7 +207,7 @@ class ExcelWorkbookReader:
         selected_values = [0, 2, 4, 6, 8]
 
         data = []
-        for row, prop in enumerate(properties):
+        for row, _ in enumerate(properties):
 
             values = [cell.value for cell in cells[row]]
 
@@ -220,7 +218,7 @@ class ExcelWorkbookReader:
 
             data.append(row)
 
-        data = pd.DataFrame(data).T
+        data = pd.DataFrame(data, index=properties, columns=ExcelWorkbookReader.times).T
         data.columns = properties
         data.set_index(pd.Series(ExcelWorkbookReader.times), inplace=True)
 

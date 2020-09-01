@@ -32,6 +32,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     display_group_averages = QtCore.pyqtSignal()
 
+    display_group_effect_statistics = QtCore.pyqtSignal()
+
+    display_time_effect_statistics = QtCore.pyqtSignal()
+
     display_group_medians = QtCore.pyqtSignal()
 
     export_group_statistics = QtCore.pyqtSignal()
@@ -150,6 +154,20 @@ class MainWindow(QtWidgets.QMainWindow):
         export_group_statistics.triggered.connect(self.on_export_group_statistics)
         group_menu.addAction(export_group_statistics)
 
+        statistics_menu = menubar.addMenu('&Statistics')
+
+        group_effect_action = QtWidgets.QAction('Group effect', self)
+        group_effect_action.setShortcut('Ctrl+G')
+        group_effect_action.setStatusTip('Display group effect statistics')
+        group_effect_action.triggered.connect(self.on_display_group_effect_statistics)
+        statistics_menu.addAction(group_effect_action)
+
+        time_effect_action = QtWidgets.QAction('Time effect', self)
+        time_effect_action.setShortcut('Ctrl+T')
+        time_effect_action.setStatusTip('Display time effect statistics')
+        time_effect_action.triggered.connect(self.on_display_time_effect_statistics)
+        statistics_menu.addAction(time_effect_action)
+
     def build_widgets(self):
         """Build the widgets.
         """
@@ -233,6 +251,18 @@ class MainWindow(QtWidgets.QMainWindow):
         """
 
         self.display_group_averages.emit()
+
+    def on_display_group_effect_statistics(self):
+        """Event fire when the user clicks on 'Display group effect' menu button.
+        """
+
+        self.display_group_effect_statistics.emit()
+
+    def on_display_time_effect_statistics(self):
+        """Event fire when the user clicks on 'Display time effect' menu button.
+        """
+
+        self.display_time_effect_statistics.emit()
 
     def on_display_group_medians(self):
         """Event fired when the user clicks on 'Display group medians plot' menu button.

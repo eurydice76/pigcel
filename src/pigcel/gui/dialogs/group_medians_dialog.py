@@ -8,9 +8,6 @@ import matplotlib.ticker as ticker
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 
-from inspigtor.gui.utils.helper_functions import find_main_window, func_formatter
-from inspigtor.kernel.utils.helper_functions import build_timeline
-
 
 class GroupMediansDialog(QtWidgets.QDialog):
     """This class implements a dialog that will show the averages of a given property for the groups defined so far.

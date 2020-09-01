@@ -4,10 +4,17 @@
 """
 
 import collections
+import logging
 
 from PyQt5 import QtCore
 
+import numpy as np
+
 import pandas as pd
+
+import scipy.stats as stats
+
+import scikit_posthocs as sk
 
 from pigcel.kernel.readers.excel_reader import UnknownPropertyError
 from pigcel.kernel.utils.stats import statistical_functions
@@ -104,6 +111,64 @@ class AnimalsPoolModel(QtCore.QAbstractListModel):
 
         return QtCore.QVariant()
 
+    def evaluate_global_time_effect(self, selected_property):
+        """Evaluate the global time effect for a given property for the pool.
+
+        Args:
+            selected_property (str): the selected property
+
+        Returns:
+            float: the p value resulting from the Friedmann test
+        """
+
+        pool_data = self.get_pool_data(selected_property)
+
+        data = []
+        for row, v in pool_data.iterrows():
+            # If there is any undefined value for this time, skip it
+            if np.isnan(v).any():
+                continue
+            data.append(v)
+
+        try:
+            return stats.friedmanchisquare(*data).pvalue
+        except ValueError:
+            return np.nan
+
+    def evaluate_pairwise_time_effect(self, selected_property):
+        """Evaluate the time effect pairwisely for a given property for the pool.
+
+        Args:
+            selected_property (str): the selected property
+
+        Returns:
+            pandas.DataFrame: the p-values resulting from the Dunn posthocs test
+        """
+
+        pool_data = self.get_pool_data(selected_property)
+
+        data = []
+        valid_times = []
+        for row, v in pool_data.iterrows():
+            # If there is any undefined value for this time, skip it
+            if np.isnan(v).any():
+                continue
+            data.append(v)
+            valid_times.append(row)
+
+        if not data:
+            raise InvalidPoolData('No valid times found for building the data used by Dunn posthoc test')
+
+        try:
+            df = sk.posthoc_dunn(data)
+            df.columns = valid_times
+            df.index = valid_times
+        except ValueError as error:
+            logging.error(str(error))
+            df = pd.DataFrame(np.nan, index=valid_times, columns=valid_times)
+
+        return df
+
     def get_pool_data(self, selected_property):
         """Get the data stored in the pool for a given property.
 
@@ -144,7 +209,7 @@ class AnimalsPoolModel(QtCore.QAbstractListModel):
             selected_statistics (list): the statistics
 
         Returns:
-            pandas.Series: the reduced data
+            pandas.DataFrame: the reduced data stored stored as pandas.DataFrame where the columns are the statistics and the row the time
         """
 
         if selected_statistics is None:
@@ -158,9 +223,12 @@ class AnimalsPoolModel(QtCore.QAbstractListModel):
 
         pool_data = self.get_pool_data(selected_property)
 
-        reduced_pool_data = collections.OrderedDict()
+        reduced_pool_data = pd.DataFrame()
         for func in selected_statistics:
-            reduced_pool_data[func] = pd.Series(statistical_functions[func](pool_data.to_numpy(), axis=1), index=pool_data.index)
+            reduced_pool_data = pd.concat([reduced_pool_data, pd.Series(
+                statistical_functions[func](pool_data.to_numpy(), axis=1), index=pool_data.index)], axis=1)
+
+        reduced_pool_data.columns = selected_statistics
 
         return reduced_pool_data
 

@@ -7,9 +7,10 @@ import logging
 from PyQt5 import QtWidgets
 
 from pylab import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
 from pigcel.kernel.readers.excel_reader import ExcelWorkbookReader
+from pigcel.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
 
 
 class PlotsWidget(QtWidgets.QWidget):
@@ -60,12 +61,12 @@ class PlotsWidget(QtWidgets.QWidget):
         self._property_plot_figure = Figure()
         self._property_plot_axes = self._property_plot_figure.add_subplot(111)
         self._property_plot_canvas = FigureCanvasQTAgg(self._property_plot_figure)
-        self._property_plot_toolbar = NavigationToolbar2QT(self._property_plot_canvas, self)
+        self._property_plot_toolbar = NavigationToolbarWithExportButton(self._property_plot_canvas, self)
 
         self._time_plot_figure = Figure()
         self._time_plot_axes = self._time_plot_figure.add_subplot(111)
         self._time_plot_canvas = FigureCanvasQTAgg(self._time_plot_figure)
-        self._time_plot_toolbar = NavigationToolbar2QT(self._time_plot_canvas, self)
+        self._time_plot_toolbar = NavigationToolbarWithExportButton(self._time_plot_canvas, self)
 
     def init_ui(self):
         """Initializes the ui

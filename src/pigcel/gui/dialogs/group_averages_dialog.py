@@ -6,10 +6,7 @@ import matplotlib.ticker as ticker
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
-from inspigtor.gui.utils.helper_functions import find_main_window, func_formatter
-from inspigtor.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
-from inspigtor.kernel.pigs.pigs_pool import PigsPoolError
-from inspigtor.kernel.utils.helper_functions import build_timeline
+from pigcel.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
 
 
 class GroupAveragesDialog(QtWidgets.QDialog):

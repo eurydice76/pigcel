@@ -4,7 +4,9 @@ import os
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from pigcel.gui.dialogs.group_averages_dialog import GroupAveragesDialog
+from pigcel.gui.dialogs.group_effect_dialog import GroupEffectDialog
 from pigcel.gui.dialogs.group_medians_dialog import GroupMediansDialog
+from pigcel.gui.dialogs.time_effect_dialog import TimeEffectDialog
 from pigcel.gui.models.animals_pool_model import AnimalsPoolModel
 from pigcel.gui.models.animals_groups_model import AnimalsGroupsModel
 from pigcel.gui.views.animals_groups_listview import AnimalsGroupsListView
@@ -38,7 +40,9 @@ class GroupsWidget(QtWidgets.QWidget):
         self._groups_list.selectionModel().currentChanged.connect(self.on_select_group)
         self._main_window.add_new_group.connect(self.on_add_group)
         self._main_window.display_group_averages.connect(self.on_display_group_averages)
+        self._main_window.display_group_effect_statistics.connect(self.on_display_group_effect_statistics)
         self._main_window.display_group_medians.connect(self.on_display_group_medians)
+        self._main_window.display_time_effect_statistics.connect(self.on_display_time_effect_statistics)
         self._main_window.export_group_statistics.connect(self.on_export_group_statistics)
         self._main_window.import_groups_from_directories.connect(self.on_import_groups)
 
@@ -50,10 +54,10 @@ class GroupsWidget(QtWidgets.QWidget):
 
         hlayout = QtWidgets.QHBoxLayout()
 
-        groupbox_laout = QtWidgets.QHBoxLayout()
-        groupbox_laout.addWidget(self._groups_list)
-        groupbox_laout.addWidget(self._animals_list)
-        self._groups_groupbox.setLayout(groupbox_laout)
+        groupbox_layout = QtWidgets.QHBoxLayout()
+        groupbox_layout.addWidget(self._groups_list)
+        groupbox_layout.addWidget(self._animals_list)
+        self._groups_groupbox.setLayout(groupbox_layout)
 
         hlayout.addWidget(self._groups_groupbox)
 
@@ -122,6 +126,36 @@ class GroupsWidget(QtWidgets.QWidget):
         dialog = GroupAveragesDialog(self._main_window.selected_property, reduced_data_per_group, self)
         dialog.show()
 
+    def on_display_group_effect_statistics(self):
+        """Display the group effect statistics.
+        """
+
+        # No animals loaded, return
+        n_animals = self._animals_model.rowCount()
+        if n_animals == 0:
+            logging.warning('No animal loaded yet')
+            return
+
+        # No group defined, return
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No group defined yet')
+            return
+
+        selected_property = self._main_window.selected_property
+
+        data_per_group = groups_model.get_data_per_group(selected_property)
+        if not data_per_group:
+            logging.warning('No group selected')
+            return
+
+        global_effect = groups_model.evaluate_global_group_effect(selected_property)
+
+        pairwise_effect = groups_model.evaluate_pairwise_group_effect(selected_property)
+
+        dialog = GroupEffectDialog(selected_property, global_effect, pairwise_effect, self)
+        dialog.show()
+
     def on_display_group_medians(self):
         """Display the group medians.
         """
@@ -142,9 +176,35 @@ class GroupsWidget(QtWidgets.QWidget):
 
         data_per_group = groups_model.get_data_per_group(selected_property)
         if not data_per_group:
+            logging.warning('No group selected')
             return
 
         dialog = GroupMediansDialog(self._main_window.selected_property, data_per_group, self)
+        dialog.show()
+
+    def on_display_time_effect_statistics(self):
+        """Display the group effect statistics.
+        """
+
+        # No animals loaded, return
+        n_animals = self._animals_model.rowCount()
+        if n_animals == 0:
+            logging.warning('No animal loaded yet')
+            return
+
+        # No group defined, return
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No group defined yet')
+            return
+
+        selected_property = self._main_window.selected_property
+
+        global_effect = groups_model.evaluate_global_time_effect(selected_property)
+
+        pairwise_effect = groups_model.evaluate_pairwise_time_effect(selected_property)
+
+        dialog = TimeEffectDialog(selected_property, global_effect, pairwise_effect, self)
         dialog.show()
 
     def on_export_group_statistics(self):
