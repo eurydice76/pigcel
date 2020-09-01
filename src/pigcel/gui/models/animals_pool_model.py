@@ -124,7 +124,7 @@ class AnimalsPoolModel(QtCore.QAbstractListModel):
         pool_data = self.get_pool_data(selected_property)
 
         data = []
-        for row, v in pool_data.iterrows():
+        for _, v in pool_data.iterrows():
             # If there is any undefined value for this time, skip it
             if np.isnan(v).any():
                 continue
