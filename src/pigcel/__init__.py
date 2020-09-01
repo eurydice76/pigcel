@@ -1,4 +1,10 @@
 
+"""pigcel 
+
+Pigcel is a PyQt-based application for visualizing and computing statistics on various physiological parameters.
+The application works with Excel spreadsheets which gather in several sheets the parameters that should be studied.
+"""
+
 import logging
 
 import numpy as np
