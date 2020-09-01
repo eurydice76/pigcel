@@ -1,5 +1,10 @@
+"""This module implements the following classes and functions:
+    - ProgressBar
+"""
+
+
 class ProgressBar:
-    """This class implements a progress bar for the whole application.
+    """This class implements as a singleton a progress bar for the whole application.
     """
 
     _instance = None

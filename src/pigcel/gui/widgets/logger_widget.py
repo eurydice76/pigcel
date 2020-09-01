@@ -1,9 +1,16 @@
+"""This module implements the following classes and functions:
+    - EnhancedTextEdit
+    - QTextEditLogger
+"""
+
 import logging
 
 from PyQt5 import QtCore, QtWidgets
 
 
 class EnhancedTextEdit(QtWidgets.QPlainTextEdit):
+    """This class implements a text edit bound to a contexttual menu.
+    """
 
     def contextMenuEvent(self, event):
         popup_menu = self.createStandardContextMenu()
@@ -33,6 +40,11 @@ class EnhancedTextEdit(QtWidgets.QPlainTextEdit):
 
 
 class QTextEditLogger(logging.Handler):
+    """This class implements a QTextEdit based handler for the application's logger.
+
+    Every logging call will be written in the QTextEdit. The logbook can be saved to a text file or cleared.
+    """
+
     def __init__(self, parent):
 
         super().__init__()

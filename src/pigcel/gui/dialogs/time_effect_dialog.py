@@ -1,3 +1,7 @@
+"""This module implements the following classes:
+    - TimeEffectDialog
+"""
+
 import logging
 import os
 

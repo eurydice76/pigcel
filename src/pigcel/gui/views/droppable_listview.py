@@ -1,4 +1,5 @@
-"""
+"""This module implements the following classes and functions:
+    - DroppableListView
 """
 
 import abc
@@ -7,6 +8,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 
 class DroppableListView(QtWidgets.QListView):
+    """This class implements an interface for listviews onto which data can be dropped in.
+    """
 
     __metaclass__ = abc.ABCMeta
 

@@ -25,7 +25,7 @@ from pigcel.kernel.utils.progress_bar import progress_bar
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    """This class implements the main window of the monitoring application.
+    """This class implements the main window of the application.
     """
 
     add_new_group = QtCore.pyqtSignal(str)

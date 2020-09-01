@@ -1,3 +1,7 @@
+"""This module implements the following classes:
+    - GroupEffectDialog
+"""
+
 import logging
 
 from PyQt5 import QtWidgets
@@ -18,7 +22,13 @@ class GroupEffectDialog(QtWidgets.QDialog):
     """
 
     def __init__(self, selected_property, global_effect, pairwise_effect,  parent=None):
-        """
+        """Constructor.
+
+        Args:
+            selected_property (str): the selected property
+            global_effect (pandas.DataFrame): the global group effect data
+            pairwise_effect (collections.OrderedDict): the pairwise group effect data
+            parent (QtCore.QObject): the parent widget
         """
 
         super(GroupEffectDialog, self).__init__(parent)

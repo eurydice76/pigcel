@@ -1,3 +1,6 @@
+"""This module implements a wrapper for a few numerical methods.
+"""
+
 import collections
 
 import numpy as np

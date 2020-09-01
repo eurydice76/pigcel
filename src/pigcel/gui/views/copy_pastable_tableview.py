@@ -1,3 +1,9 @@
+"""This module implements the following classes and functions:
+    - copy_selection
+    - CopyFilter
+    - CopyPastableTableView
+"""
+
 import csv
 import io
 

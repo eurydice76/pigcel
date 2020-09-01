@@ -1,7 +1,14 @@
+"""This module implements the following classes and functions:
+    - MultipleDirectoriesSelector
+"""
+
 from PyQt5 import QtWidgets
 
 
 class MultipleDirectoriesSelector(QtWidgets.QFileDialog):
+    """This class implements a widget that mimics a file selector but for selecting several directories.
+    """
+
     def __init__(self, *args):
 
         super(MultipleDirectoriesSelector, self).__init__(*args)

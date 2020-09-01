@@ -1,3 +1,8 @@
+"""This module implements the following classes:
+    - GroupsWidget
+"""
+
+
 import logging
 import os
 

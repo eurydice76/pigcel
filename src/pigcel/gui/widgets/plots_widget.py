@@ -1,5 +1,5 @@
 """This modules implements the following classes:
-    - MonitoringPlotsWidget
+    - PlotsWidget
 """
 
 import logging

@@ -1,3 +1,7 @@
+"""This module implements the following classes and functions:
+    - DoubleClickableListView
+"""
+
 import csv
 import io
 

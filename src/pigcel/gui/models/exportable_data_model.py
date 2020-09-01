@@ -1,3 +1,7 @@
+"""This module implements the following classes:
+    - ExportableDataModel    
+"""
+
 import logging
 
 import openpyxl
@@ -8,6 +12,8 @@ from pigcel.gui.models.pandas_data_model import PandasDataModel
 
 
 class ExportableDataModel(PandasDataModel):
+    """This class implements a pandas-basd data model which is exportable.
+    """
 
     def export(self, filename):
         """Export the current model to the given excel file.

@@ -1,4 +1,5 @@
-"""
+"""This module implements the following classes:
+    - AnimalsGroupsListView
 """
 
 from PyQt5 import QtCore, QtGui, QtWidgets

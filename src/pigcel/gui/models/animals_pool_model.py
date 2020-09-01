@@ -1,6 +1,7 @@
 
 """This module implements the following classes:
-    - MonitoringDataModel
+    - InvalidPoolData
+    - AnimalsPoolModel
 """
 
 import collections

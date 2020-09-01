@@ -1,3 +1,10 @@
+"""This module implements the following classes and functions:
+    - InvalidExcelWorkbookError
+    - UnknownPropertyError
+    - InvalidTimeError
+    - ExcelWorkbookReader
+"""
+
 import collections
 import os
 import sys
@@ -25,6 +32,9 @@ class InvalidTimeError(Exception):
 
 
 class ExcelWorkbookReader:
+    """This class implements the reader for the data stored in excel file. To be valid the excel file must contain respectively
+    'Suivi', 'Data', 'Gaz du sang' and 'NFS' sheets.
+    """
 
     times = ['T-30', 'T0', 'T10', 'T20', 'T30', 'T1H', 'T1H30', 'T2H', 'T3H', 'T4H', 'T5H', 'T6H']
 

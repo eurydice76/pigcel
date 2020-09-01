@@ -1,3 +1,7 @@
+"""This modules implements the following classes:
+    - NavigationToolbarWithExportButton
+"""
+
 import logging
 import os
 
