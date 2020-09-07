@@ -229,39 +229,6 @@ class AnimalsGroupsModel(QtCore.QAbstractListModel):
 
         return p_values
 
-    def evaluate_premortem_time_effect(self, selected_property, *, n_target_times=6):
-        """Compute the premortem time effect for each pool of the group. 
-
-        Args:
-            selected_property (str): the property
-            n_target_times (int): the number of times before the animal's death for evaluating the time effect
-
-        Returns:
-            2-tuple: a 2-tuple whose 1st element is a pandas.DataFrame stroring the Friedman p value for each group 
-            of the group and the second element is the collections.OrderedDict storing the Dunn matrix for each group.
-        """
-
-        selected_groups = [(k, v[0]) for k, v in self._groups.items() if v[1]]
-        if len(selected_groups) < 1:
-            logging.error('No group selected for evaluating the premortem time effect')
-            return
-
-        friedman_p_values = []
-        dunn_matrices = collections.OrderedDict()
-        for group, animals_pool_model in selected_groups:
-            try:
-                friedman_p_value, dunn_matrix = animals_pool_model.evaluate_premortem_time_effect(selected_property, n_target_times=n_target_times)
-            except InvalidTimeError as error:
-                logging.error(str(error))
-                continue
-            friedman_p_values.append(friedman_p_value)
-            dunn_matrices[group] = dunn_matrix
-
-        group_names = [v[0] for v in selected_groups]
-        friedman_p_values = pd.DataFrame(friedman_p_values, index=group_names, columns=['p-value'])
-
-        return friedman_p_values, dunn_matrices
-
     def export_statistics(self, filename, selected_property='APs'):
         """Export basic statistics (average, median, std, quartile ...) for each group and interval to an excel file.
 
