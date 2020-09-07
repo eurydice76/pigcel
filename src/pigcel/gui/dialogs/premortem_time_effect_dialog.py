@@ -1,9 +1,8 @@
-"""This module implements the following classes:
-    - TimeEffectDialog
+"""This module implements the following class:
+    - PreMortemStatisticsDialog
 """
 
 import logging
-import os
 
 import numpy as np
 
@@ -13,34 +12,38 @@ from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 
 from pigcel.gui.models.pvalues_data_model import PValuesDataModel
-from pigcel.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
 from pigcel.gui.views.copy_pastable_tableview import CopyPastableTableView
+from pigcel.kernel.readers.excel_reader import ExcelWorkbookReader
 
 
-class TimeEffectDialog(QtWidgets.QDialog):
-    """This class implements the dialog that shows the group effect. It is made of three plots which plots respectively the
-    number of groups used to perform the statistical test, the p value resulting from the kruskal-wallis or Mann-Whitney
-    statistical test and the group-pairwise p values resulting from the Dunn test.
+class PremortemTimeEffectDialog(QtWidgets.QDialog):
+    """This class implements the dialog for premortem time effect analysis.
+
+    It will perform the analysis on a groups of animals pool.
     """
 
-    def __init__(self, selected_property, global_effect, pairwise_effect,  parent=None):
-        """
+    def __init__(self, groups_model, selected_property, parent=None):
+        """Constructor.
+
+        Args:
+            groups_model (pigcel.gui.models.animals_groups_model.AnimalsGroupsModel): the group model
+            selected_property (str): the selected property
+            parent (QtCore.QObject): the parent widget
         """
 
-        super(TimeEffectDialog, self).__init__(parent)
+        super(PremortemTimeEffectDialog, self).__init__(parent)
+
+        self._groups_model = groups_model
 
         self._selected_property = selected_property
-
-        self._global_effect = global_effect
-
-        self._pairwise_effect = pairwise_effect
 
         self.init_ui()
 
     def build_events(self):
-        """Build the signal/slots
+        """Build signal/slots
         """
 
+        self._compute_premortem_statistics_button.clicked.connect(self.on_compute_premortem_time_effect)
         self._selected_group.currentIndexChanged.connect(self.on_select_group)
         self._pairwise_effect_tableview.customContextMenuRequested.connect(self.on_show_pairwise_effect_table_menu)
 
@@ -49,6 +52,13 @@ class TimeEffectDialog(QtWidgets.QDialog):
         """
 
         main_layout = QtWidgets.QVBoxLayout()
+
+        hlayout = QtWidgets.QHBoxLayout()
+
+        hlayout.addWidget(self._n_target_times_label)
+        hlayout.addWidget(self._n_target_times_spinbox)
+        hlayout.addWidget(self._compute_premortem_statistics_button)
+        main_layout.addLayout(hlayout)
 
         global_effect_groupbox_layout = QtWidgets.QVBoxLayout()
         global_effect_groupbox_layout.addWidget(self._global_effect_tableview)
@@ -66,29 +76,85 @@ class TimeEffectDialog(QtWidgets.QDialog):
         self.setLayout(main_layout)
 
     def build_widgets(self):
-        """Build and/or initialize the widgets of the dialog.
+        """Build the widgets.
         """
 
         self.setWindowTitle('Time effect statistics for {} property'.format(self._selected_property))
 
+        self._n_target_times_label = QtWidgets.QLabel('Number of target times')
+
+        self._n_target_times_spinbox = QtWidgets.QSpinBox()
+        self._n_target_times_spinbox.setMinimum(1)
+        self._n_target_times_spinbox.setMaximum(len(ExcelWorkbookReader.times)-1)
+        self._n_target_times_spinbox.setValue(6)
+
+        self._compute_premortem_statistics_button = QtWidgets.QPushButton('Run')
+
         self._global_effect_groupbox = QtWidgets.QGroupBox('Global effect')
 
         self._global_effect_tableview = CopyPastableTableView()
-        model = PValuesDataModel(self._global_effect, self)
-        self._global_effect_tableview.setModel(model)
-        for col in range(model.columnCount()):
-            self._global_effect_tableview.horizontalHeader().setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
 
         self._pairwise_effect_groupbox = QtWidgets.QGroupBox('Pairwise effect')
 
         self._selected_group = QtWidgets.QComboBox()
-        self._selected_group.addItems(self._pairwise_effect.keys())
+        selected_groups = []
+        for i in range(self._groups_model.rowCount()):
+            index = self._groups_model.index(i)
+            checkstate = self._groups_model.data(index, QtCore.Qt.CheckStateRole)
+            group = self._groups_model.data(index, QtCore.Qt.DisplayRole)
+            if checkstate == QtCore.Qt.Checked:
+                selected_groups.append(group)
+        self._selected_group.addItems(selected_groups)
 
         self._pairwise_effect_tableview = CopyPastableTableView()
         self._pairwise_effect_tableview.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
+        # self._friedman_figure = Figure()
+        # self._friedman_axes = self._friedman_figure.add_subplot(111)
+        # self._friedman_canvas = FigureCanvasQTAgg(self._friedman_figure)
+        # self._friedman_toolbar = NavigationToolbar2QT(self._friedman_canvas, self)
+
+        # self._dunn_groupbox = QtWidgets.QGroupBox('Pairwise effect')
+
+        # self._selected_group_label = QtWidgets.QLabel('Selected group')
+
+        # self._selected_group_combo = QtWidgets.QComboBox()
+
+        # selected_groups = self._groups_model.selected_groups
+
+        # self._selected_group_combo.addItems(selected_groups)
+
+        # self._dunn_table = CopyPastableTableView()
+        # self._dunn_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        # self._dunn_table.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
+        # self._dunn_table.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+
+    def on_compute_premortem_time_effect(self):
+        """Event fired when the user click on the 'Run' button.
+
+        It will compute the premortem statistics and update the friedman and dunn widgets accordingly.
+        """
+
+        n_target_times = self._n_target_times_spinbox.value()
+
+        self._friedman_p_values, self._dunn_matrices = self._groups_model.evaluate_premortem_time_effect(
+            self._selected_property, n_target_times=n_target_times)
+
+        self.update()
+
+    def update(self):
+        """Display the global time effect and the pairwise time effect.
+        """
+
+        model = PValuesDataModel(self._friedman_p_values, self)
+        self._global_effect_tableview.setModel(model)
+        for col in range(model.columnCount()):
+            self._global_effect_tableview.horizontalHeader().setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+
+        self.on_select_group(0)
+
     def init_ui(self):
-        """Initialiwes the dialog.
+        """Initializes the ui.
         """
 
         self.build_widgets()
@@ -96,8 +162,6 @@ class TimeEffectDialog(QtWidgets.QDialog):
         self.build_layout()
 
         self.build_events()
-
-        self.on_select_group(0)
 
     def on_select_group(self, index):
         """Event handler called when the user select a different group from the group selection combo box.
@@ -108,7 +172,7 @@ class TimeEffectDialog(QtWidgets.QDialog):
 
         selected_group = self._selected_group.currentText()
 
-        model = PValuesDataModel(self._pairwise_effect[selected_group], self)
+        model = PValuesDataModel(self._dunn_matrices[selected_group], self)
         self._pairwise_effect_tableview.setModel(model)
 
         for col in range(model.columnCount()):

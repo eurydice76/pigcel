@@ -11,6 +11,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from pigcel.gui.dialogs.group_averages_dialog import GroupAveragesDialog
 from pigcel.gui.dialogs.group_effect_dialog import GroupEffectDialog
 from pigcel.gui.dialogs.group_medians_dialog import GroupMediansDialog
+from pigcel.gui.dialogs.premortem_time_effect_dialog import PremortemTimeEffectDialog
 from pigcel.gui.dialogs.time_effect_dialog import TimeEffectDialog
 from pigcel.gui.models.animals_pool_model import AnimalsPoolModel
 from pigcel.gui.models.animals_groups_model import AnimalsGroupsModel
@@ -47,6 +48,7 @@ class GroupsWidget(QtWidgets.QWidget):
         self._main_window.display_group_averages.connect(self.on_display_group_averages)
         self._main_window.display_group_effect_statistics.connect(self.on_display_group_effect_statistics)
         self._main_window.display_group_medians.connect(self.on_display_group_medians)
+        self._main_window.display_premortem_statistics.connect(self.on_display_premortem_statistics)
         self._main_window.display_time_effect_statistics.connect(self.on_display_time_effect_statistics)
         self._main_window.export_group_statistics.connect(self.on_export_group_statistics)
         self._main_window.import_groups_from_directories.connect(self.on_import_groups)
@@ -185,6 +187,27 @@ class GroupsWidget(QtWidgets.QWidget):
             return
 
         dialog = GroupMediansDialog(self._main_window.selected_property, data_per_group, self)
+        dialog.show()
+
+    def on_display_premortem_statistics(self):
+        """Display the premortem time effect statistics.
+        """
+
+        # No animals loaded, return
+        n_animals = self._animals_model.rowCount()
+        if n_animals == 0:
+            logging.warning('No animal loaded yet')
+            return
+
+        # No group defined, return
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No group defined yet')
+            return
+
+        selected_property = self._main_window.selected_property
+
+        dialog = PremortemTimeEffectDialog(groups_model, selected_property, self)
         dialog.show()
 
     def on_display_time_effect_statistics(self):

@@ -34,6 +34,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     display_group_effect_statistics = QtCore.pyqtSignal()
 
+    display_premortem_statistics = QtCore.pyqtSignal()
+
     display_time_effect_statistics = QtCore.pyqtSignal()
 
     display_group_medians = QtCore.pyqtSignal()
@@ -162,11 +164,19 @@ class MainWindow(QtWidgets.QMainWindow):
         group_effect_action.triggered.connect(self.on_display_group_effect_statistics)
         statistics_menu.addAction(group_effect_action)
 
-        time_effect_action = QtWidgets.QAction('Time effect', self)
+        time_effect_menu = statistics_menu.addMenu('&Time effect')
+
+        time_effect_action = QtWidgets.QAction('Global', self)
         time_effect_action.setShortcut('Ctrl+T')
         time_effect_action.setStatusTip('Display time effect statistics')
         time_effect_action.triggered.connect(self.on_display_time_effect_statistics)
-        statistics_menu.addAction(time_effect_action)
+        time_effect_menu.addAction(time_effect_action)
+
+        premortem_action = QtWidgets.QAction('Premortem', self)
+        premortem_action.setShortcut('Ctrl+P')
+        premortem_action.setStatusTip('Display premortem statistics')
+        premortem_action.triggered.connect(self.on_display_premortem_statistics)
+        time_effect_menu.addAction(premortem_action)
 
     def build_widgets(self):
         """Build the widgets.
@@ -257,6 +267,12 @@ class MainWindow(QtWidgets.QMainWindow):
         """
 
         self.display_group_effect_statistics.emit()
+
+    def on_display_premortem_statistics(self):
+        """Event fire when the user clicks on 'Display premortem statistics' menu button.
+        """
+
+        self.display_premortem_statistics.emit()
 
     def on_display_time_effect_statistics(self):
         """Event fire when the user clicks on 'Display time effect' menu button.

@@ -103,11 +103,12 @@ class ExcelWorkbookReader:
 
         return data
 
-    def get_property_slice(self, selected_property):
-        """Return a slice of the data according to a given property.
+    def get_property_slice(self, selected_property, selected_times=None):
+        """Return a slice of the data according to a given property and selected times.
 
         Args:
-            selected_property (str): the property
+            selected_property (str): the selected property
+            times (list of str): the selected times
 
         Returns:
             pd.Series: the slice
@@ -118,7 +119,20 @@ class ExcelWorkbookReader:
         if selected_property not in data.columns:
             raise UnknownPropertyError('The property {} is unknown'.format(selected_property))
 
-        data = data[selected_property]
+        if selected_times is None:
+            selected_times = data.index
+        else:
+            temp = []
+            for s in selected_times:
+                if s not in data.index:
+                    continue
+                temp.append(s)
+            selected_times = pd.Index(temp)
+
+        if selected_times.empty:
+            raise InvalidTimeError('The selected times are not valid times')
+
+        data = data[selected_property].loc[selected_times]
 
         return data
 
