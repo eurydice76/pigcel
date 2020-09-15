@@ -188,7 +188,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._selected_time_label = QtWidgets.QLabel('Time')
         self._selected_time_combo = QtWidgets.QComboBox()
-        self._selected_time_combo.addItems(ExcelWorkbookReader.times)
 
         self._data_table = CopyPastableTableView()
         self._data_table.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
@@ -297,12 +296,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
         groups = collections.OrderedDict()
 
+        all_properties = set([self._selected_property_combo.itemText(index) for index in range(self._selected_property_combo.count())])
+        all_times = set([self._selected_time_combo.itemText(index) for index in range(self._selected_time_combo.count())])
+
         # Loop over the pig directories
         for progress, exp_dir in enumerate(experimental_dirs):
 
             data_files = glob.glob(os.path.join(exp_dir, '*.xls[x]'))
 
-            # Loop over the Data*csv csv files found in the current oig directory
+            # Loop over the Data*csv csv files found in the current directory
             for data_file in data_files:
                 try:
                     reader = ExcelWorkbookReader(data_file)
@@ -312,11 +314,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 else:
                     animals_data_model.add_workbook(reader)
                     groups.setdefault(os.path.basename(exp_dir), []).append(data_file)
-                    self._selected_property_combo.clear()
-                    self._selected_property_combo.addItems(reader.properties)
+                    all_properties.update(reader.data.columns)
+                    all_times.update(reader.data.index)
 
             n_loaded_dirs += 1
             progress_bar.update(progress+1)
+
+        self._selected_property_combo.clear()
+        self._selected_property_combo.addItems(sorted(all_properties))
+
+        self._selected_time_combo.clear()
+        self._selected_time_combo.addItems(sorted(all_times))
 
         # Create a signal/slot connexion for row changed event
         self._animals_list.selectionModel().selectionChanged.connect(self.on_select_animal)
@@ -343,6 +351,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         n_loaded_files = 0
 
+        all_properties = set([self._selected_property_combo.itemText(index) for index in range(self._selected_property_combo.count())])
+        all_times = set([self._selected_time_combo.itemText(index) for index in range(self._selected_time_combo.count())])
+
         # Loop over the pig directories
         for progress, xlsx_file in enumerate(xlsx_files):
 
@@ -357,8 +368,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 n_loaded_files += 1
             finally:
                 self._selected_property_combo.clear()
-                self._selected_property_combo.addItems(reader.properties)
                 progress_bar.update(progress+1)
+
+        self._selected_property_combo.clear()
+        self._selected_property_combo.addItems(sorted(all_properties))
+
+        self._selected_time_combo.clear()
+        self._selected_time_combo.addItems(sorted(all_times))
 
         # Create a signal/slot connexion for row changed event
         self._animals_list.selectionModel().selectionChanged.connect(self.on_select_animal)
@@ -393,8 +409,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         selected_data = []
         for wb in selected_workbooks:
-            wb_data = wb.get_property_slice(selected_property)
-            selected_data.append((wb.basename, wb_data))
+            property_slice = wb.get_property_slice(selected_property)
+            selected_data.append((wb.basename, property_slice))
 
         selected_data = (selected_property, selected_data)
         self.update_property_plot.emit(selected_data)
@@ -421,8 +437,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         selected_data = []
         for wb in selected_workbooks:
-            wb_data = wb.get_time_slice(selected_time)[selected_property]
-            selected_data.append((wb.basename, wb_data))
+            time_slice = wb.get_time_slice(selected_time)
+            value = time_slice[selected_property].loc[selected_time]
+            selected_data.append((wb.basename, value))
         selected_data = (selected_property, selected_time, selected_data)
 
         self.update_time_plot.emit(selected_data)
@@ -439,9 +456,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if not selected_indexes:
             return
 
-        data = self._animals_list.model().data(selected_indexes[0], AnimalsDataModel.Workbook).get_data()
+        dataframe = self._animals_list.model().data(selected_indexes[0], AnimalsDataModel.Workbook).data
 
-        workbook_data_model = WorkbookDataModel(data)
+        workbook_data_model = WorkbookDataModel(dataframe)
 
         self._data_table.setModel(workbook_data_model)
 

@@ -2,14 +2,17 @@
     - PlotsWidget
 """
 
+import datetime
 import logging
 
 from PyQt5 import QtWidgets
 
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.dates import DateFormatter
 
 from pigcel.kernel.readers.excel_reader import ExcelWorkbookReader
+from pigcel.kernel.utils.time_io import add_time
 from pigcel.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
 
 
@@ -85,8 +88,6 @@ class PlotsWidget(QtWidgets.QWidget):
             data (tuple): the data to plot
         """
 
-        times = ExcelWorkbookReader.times
-
         selected_property, data_per_animal = data
 
         animals = [v[0] for v in data_per_animal]
@@ -97,9 +98,22 @@ class PlotsWidget(QtWidgets.QWidget):
         self._property_plot_axes.set_xlabel('time')
         self._property_plot_axes.set_ylabel(selected_property)
 
-        for values_per_animal in all_animals_values:
-            self._property_plot_axes.plot(times, values_per_animal)
+        x_axis_format = DateFormatter('%Hh%M')
+        self._property_plot_axes.xaxis.set_major_formatter(x_axis_format)
 
+        all_dates = set()
+        real_times = set()
+        for values_per_animal in all_animals_values:
+
+            times = [add_time(t, 30) for t in values_per_animal.index]
+            dates = [datetime.datetime.strptime(t, '%Hh%M') for t in times]
+
+            all_dates.update(dates)
+            real_times.update(values_per_animal.index)
+            self._property_plot_axes.plot(dates, values_per_animal, '.')
+
+        self._property_plot_axes.set_xticks(sorted(all_dates))
+        self._property_plot_axes.set_xticklabels(sorted(real_times), rotation=25)
         self._property_plot_axes.legend(animals)
 
         self._property_plot_canvas.draw()

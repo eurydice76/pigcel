@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 from PyQt5 import QtCore, QtWidgets
@@ -5,8 +6,10 @@ from PyQt5 import QtCore, QtWidgets
 import matplotlib.ticker as ticker
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.dates import DateFormatter
 
 from pigcel.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
+from pigcel.kernel.utils.time_io import add_time
 
 
 class GroupAveragesDialog(QtWidgets.QDialog):
@@ -94,15 +97,28 @@ class GroupAveragesDialog(QtWidgets.QDialog):
         self._axes.set_xlabel('time')
         self._axes.set_ylabel(self._selected_property)
 
+        x_axis_format = DateFormatter('%Hh%M')
+        self._axes.xaxis.set_major_formatter(x_axis_format)
+
+        all_dates = set()
+        real_times = set()
         for group in selected_groups:
 
-            x = self._reduced_data_per_group[group]['mean'].index
+            times = [add_time(t, 30) for t in self._reduced_data_per_group[group]['mean'].index]
+            dates = [datetime.datetime.strptime(t, '%Hh%M') for t in times]
+
+            all_dates.update(dates)
+            real_times.update(self._reduced_data_per_group[group]['mean'].index)
+
             y = self._reduced_data_per_group[group]['mean']
             yerr = self._reduced_data_per_group[group]['std']
 
-            self._axes.errorbar(x, y, yerr=yerr, fmt='o')
+            self._axes.errorbar(dates, y, yerr=yerr, fmt='o')
 
         group_names = selected_groups
+
+        self._axes.set_xticks(sorted(all_dates))
+        self._axes.set_xticklabels(sorted(real_times), rotation=25)
 
         self._axes.legend(group_names)
 

@@ -125,17 +125,24 @@ class AnimalsPoolModel(QtCore.QAbstractListModel):
 
         pool_data = self.get_pool_data(selected_property)
 
+        # Times is a nested list whose element are the time and a bool indicating whether or not this time is valid
+        # (i.e if the corresponding row in the pool data contains any nan value then this time is considered as invalid)
+        times = []
         data = []
-        for _, v in pool_data.iterrows():
+        for time, v in pool_data.iterrows():
             # If there is any undefined value for this time, skip it
             if np.isnan(v).any():
-                continue
-            data.append(v)
+                times.append((time, False))
+            else:
+                data.append(v)
+                times.append((time, True))
 
         try:
-            return stats.friedmanchisquare(*data).pvalue
+            p_value = stats.friedmanchisquare(*data).pvalue
         except ValueError:
-            return np.nan
+            p_value = np.nan
+        finally:
+            return times, p_value
 
     def evaluate_pairwise_time_effect(self, selected_property):
         """Evaluate the time effect pairwisely for a given property for the pool.
@@ -158,18 +165,21 @@ class AnimalsPoolModel(QtCore.QAbstractListModel):
             data.append(v)
             valid_times.append(row)
 
-        if not data:
-            raise InvalidPoolData('No valid times found for building the data used by Dunn posthoc test')
+        p_values = pd.DataFrame(np.nan, index=pool_data.index, columns=pool_data.index)
 
         try:
-            df = sk.posthoc_dunn(data)
-            df.columns = valid_times
-            df.index = valid_times
+            valid_times_p_values = sk.posthoc_dunn(data)
+            valid_times_p_values.columns = valid_times
+            valid_times_p_values.index = valid_times
+
+            for row in valid_times:
+                for col in valid_times:
+                    p_values[col].loc[row] = valid_times_p_values[col].loc[row]
+
         except ValueError as error:
             logging.error(str(error))
-            df = pd.DataFrame(np.nan, index=valid_times, columns=valid_times)
 
-        return df
+        return p_values
 
     def get_pool_data(self, selected_property):
         """Get the data stored in the pool for a given property.
@@ -182,25 +192,12 @@ class AnimalsPoolModel(QtCore.QAbstractListModel):
         """
 
         data = pd.DataFrame()
-        valid_animals = []
         for animal in self._animals:
-            wb = self._animals_data_model.get_workbook(animal)
-            if wb is None:
-                continue
+            workbook = self._animals_data_model.get_workbook(animal)
+            property_slice = workbook.get_property_slice(selected_property)
+            data = pd.concat([data, property_slice], axis=1)
 
-            try:
-                property_slice = wb.get_property_slice(selected_property)
-            except (UnknownPropertyError, InvalidTimeError) as error:
-                logging.error(str(error))
-                continue
-            else:
-                valid_animals.append(animal)
-                data = pd.concat([data, property_slice], axis=1)
-
-        if not valid_animals:
-            raise InvalidPoolData('No valid animal was found for this pool')
-
-        data.columns = valid_animals
+        data.sort_index(ascending=True, inplace=True)
 
         return data
 

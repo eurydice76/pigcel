@@ -24,6 +24,8 @@ class AnimalsGroupsModel(QtCore.QAbstractListModel):
 
     AnimalsPoolModel = QtCore.Qt.UserRole + 1
 
+    Times = QtCore.Qt.UserRole + 2
+
     def __init__(self, parent):
         """Constructor.
 
@@ -95,39 +97,53 @@ class AnimalsGroupsModel(QtCore.QAbstractListModel):
         selected_groups = [(k, v[0]) for k, v in self._groups.items() if v[1]]
         if len(selected_groups) < 2:
             logging.error('Less than two groups selected for evaluating global group effect')
-            return
-
-        times = ExcelWorkbookReader.times
+            return None
 
         data_pooled_per_time = collections.OrderedDict()
-        for t in times:
-            data_pooled_per_time[t] = []
 
+        # Retrieve all the times defined across all the pool data
+        all_pool_data = []
+        all_times = set()
         for _, animals_pool_model in selected_groups:
-            pool_data = animals_pool_model.get_pool_data(selected_property)
-            for time, values_per_animal in pool_data.iterrows():
-                nan_filtered_values = [v for v in values_per_animal if not np.isnan(v)]
-                data_pooled_per_time[time].append(nan_filtered_values)
+            all_pool_data.append(animals_pool_model.get_pool_data(selected_property))
+            all_times.update(all_pool_data[-1].index)
+        all_times = sorted(all_times)
 
+        # Loop over  all the pool data
+        for pool_data in all_pool_data:
+            for time in all_times:
+                # If time is a defined in the pool_data, filter out the corresponding row from any nan value
+                if time in pool_data.index:
+                    nan_filtered_values = [v for v in pool_data.loc[time] if not np.isnan(v)]
+                else:
+                    nan_filtered_values = []
+                data_pooled_per_time.setdefault(time, []).append(nan_filtered_values)
+
+        # p_values_per_time will be a DataFrame whose index are the times and the n - 1 first columns are the number of animal for each group
+        # while the nth value is the p value
         p_values_per_time = []
-        for _, values_per_group in data_pooled_per_time.items():
-            # Case where non of the animals has a defined value for this time. The global effect can not be evaluated for this time
-            if [] in values_per_group:
+        for values_per_group in data_pooled_per_time.values():
+            # If the number of group is < 2, the group effect can not be assessed. Set the p value to nan
+            if len(values_per_group) < 2:
                 p_value = np.nan
             else:
-                try:
-                    if len(values_per_group) > 2:
-                        p_value = stats.kruskal(*values_per_group).pvalue
-                    else:
-                        p_value = stats.mannwhitneyu(*values_per_group, alternative='two-sided').pvalue
-                except ValueError as e:
-                    logging.warning(str(e))
+                # If one of the group has no valid values, set the p value to nan
+                if [] in values_per_group:
                     p_value = np.nan
+                else:
+                    try:
+                        if len(values_per_group) > 2:
+                            p_value = stats.kruskal(*values_per_group).pvalue
+                        else:
+                            p_value = stats.mannwhitneyu(*values_per_group, alternative='two-sided').pvalue
+                    except ValueError as error:
+                        p_value = np.nan
+                        logging.warning(str(error))
             p_values_per_time.append([len(v) for v in values_per_group] + [p_value])
 
         group_names = [v[0] for v in selected_groups]
         columns = group_names + ['p value']
-        p_values = pd.DataFrame(p_values_per_time, index=times, columns=columns)
+        p_values = pd.DataFrame(p_values_per_time, index=list(data_pooled_per_time.keys()), columns=columns)
 
         return p_values
 
@@ -138,6 +154,7 @@ class AnimalsGroupsModel(QtCore.QAbstractListModel):
             selected_property (str): the selected property
 
         Returns:
+            dict: the time status for each selected group
             pandas.DataFrame: the Friedman chi square p_values for the selected groups
         """
 
@@ -148,19 +165,17 @@ class AnimalsGroupsModel(QtCore.QAbstractListModel):
 
         p_values = []
         group_names = []
+        times_per_group = {}
+        # Loop over the animal pools
         for group, animals_pool_model in selected_groups:
-            try:
-                p_value = animals_pool_model.evaluate_global_time_effect(selected_property)
-            except UnknownPropertyError as error:
-                logging.error(str(error))
-                return
-            else:
-                p_values.append(p_value)
-                group_names.append(group)
+            times, p_value = animals_pool_model.evaluate_global_time_effect(selected_property)
+            p_values.append(p_value)
+            group_names.append(group)
+            times_per_group[group] = times
 
         p_values = pd.DataFrame(p_values, index=group_names, columns=['p-value'])
 
-        return p_values
+        return times_per_group, p_values
 
     def evaluate_pairwise_group_effect(self, selected_property):
         """Evaluate the group effect pairwisely for a given property for the selected groups.
@@ -177,27 +192,36 @@ class AnimalsGroupsModel(QtCore.QAbstractListModel):
             logging.error('Less than two groups selected for evaluating global group effect')
             return
 
-        times = ExcelWorkbookReader.times
-
         data_pooled_per_time = collections.OrderedDict()
-        for t in times:
-            data_pooled_per_time[t] = []
 
+        # Take all the times defined across all the pool data
+        all_pool_data = []
+        all_times = set()
         for _, animals_pool_model in selected_groups:
-            pool_data = animals_pool_model.get_pool_data(selected_property)
-            for time, values_per_animal in pool_data.iterrows():
-                nan_filtered_values = [v for v in values_per_animal if not np.isnan(v)]
-                data_pooled_per_time[time].append(nan_filtered_values)
+            all_pool_data.append(animals_pool_model.get_pool_data(selected_property))
+            all_times.update(all_pool_data[-1].index)
+        all_times = sorted(all_times)
+
+        for pool_data in all_pool_data:
+            for time in all_times:
+                if time in pool_data.index:
+                    nan_filtered_values = [v for v in pool_data.loc[time] if not np.isnan(v)]
+                else:
+                    nan_filtered_values = []
+                data_pooled_per_time.setdefault(time, []).append(nan_filtered_values)
 
         group_names = [v[0] for v in selected_groups]
 
         p_values_per_time = collections.OrderedDict()
         for time, values_per_group in data_pooled_per_time.items():
-            # Case where none of the animals has a defined value for this time. The pairwise effect can not be evaluated for this time
-            if [] in values_per_group:
+            if len(values_per_group) < 2:
                 p_values_per_time[time] = pd.DataFrame(np.nan, index=group_names, columns=group_names)
             else:
-                p_values_per_time[time] = pd.DataFrame(sk.posthoc_dunn(values_per_group).to_numpy(), index=group_names, columns=group_names)
+                # If one of the group has no valid values, set the Dunn matrix to nan
+                if [] in values_per_group:
+                    p_values_per_time[time] = pd.DataFrame(np.nan, index=group_names, columns=group_names)
+                else:
+                    p_values_per_time[time] = pd.DataFrame(sk.posthoc_dunn(values_per_group).to_numpy(), index=group_names, columns=group_names)
 
         return p_values_per_time
 
@@ -254,6 +278,8 @@ class AnimalsGroupsModel(QtCore.QAbstractListModel):
             except InvalidPoolData:
                 logging.error('Could not get reduced pool data for group {}. Skip it.'.format(group))
                 continue
+
+            reduced_data.sort_index(inplace=True)
 
             # Create the excel worksheet
             workbook.create_sheet(group)
@@ -356,8 +382,6 @@ class AnimalsGroupsModel(QtCore.QAbstractListModel):
             if selected:
                 reduced_data = animals_pool_model.get_reduced_data(selected_property, selected_statistics)
                 reduced_data_per_group[group] = reduced_data
-
-        print(reduced_data_per_group)
 
         return reduced_data_per_group
 

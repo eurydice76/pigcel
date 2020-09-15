@@ -155,6 +155,8 @@ class GroupsWidget(QtWidgets.QWidget):
             return
 
         global_effect = groups_model.evaluate_global_group_effect(selected_property)
+        if global_effect is None:
+            return
 
         pairwise_effect = groups_model.evaluate_pairwise_group_effect(selected_property)
 
@@ -205,11 +207,11 @@ class GroupsWidget(QtWidgets.QWidget):
 
         selected_property = self._main_window.selected_property
 
-        global_effect = groups_model.evaluate_global_time_effect(selected_property)
+        times_per_group, global_effect = groups_model.evaluate_global_time_effect(selected_property)
 
         pairwise_effect = groups_model.evaluate_pairwise_time_effect(selected_property)
 
-        dialog = TimeEffectDialog(selected_property, global_effect, pairwise_effect, self)
+        dialog = TimeEffectDialog(selected_property, global_effect, pairwise_effect, times_per_group, self)
         dialog.show()
 
     def on_export_group_statistics(self):

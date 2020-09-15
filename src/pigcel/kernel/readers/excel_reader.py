@@ -6,6 +6,7 @@
 """
 
 import collections
+import logging
 import os
 import sys
 
@@ -45,7 +46,7 @@ class ExcelWorkbookReader:
             filename (str): the path to the workbook
         """
 
-        self._workbook = openpyxl.load_workbook(filename)
+        self._workbook = openpyxl.load_workbook(filename, data_only=True)
 
         sheet_names = set(self._workbook.get_sheet_names())
 
@@ -54,31 +55,29 @@ class ExcelWorkbookReader:
 
         self._filename = filename
 
-    @property
-    def properties(self):
-        """Returns the properties stored in the workbook. Only the sheet 'Data', 'Gaz du sang' and 'NFS' are considered.
-
-        Returns:
-            list of str: the properties
-        """
-
-        properties = []
-
-        data_sheet = self._workbook.get_sheet_by_name('Data')
-        properties.extend([data_sheet.cell(row=6, column=col).value for col in range(3, 22)])
-
-        blood_gas_sheet = self._workbook.get_sheet_by_name('Gaz du sang')
-        properties.extend([blood_gas_sheet.cell(row=row, column=1).value for row in range(6, 31)])
-
-        nfs_sheet = self._workbook.get_sheet_by_name('NFS')
-        properties.extend([nfs_sheet.cell(row=row, column=3).value for row in range(3, 17)])
-
-        return properties
+        self._data = self.parse_data_worksheet()
+        self._data = pd.concat([self._data, self.parse_blood_gas_worksheet()], axis=1)
+        self._data = pd.concat([self._data, self.parse_nfs_worksheet()], axis=1)
 
     @property
     def basename(self):
+        """Returns the basename of the excel file.
+
+        Returns:
+            str: the basename
+        """
 
         return os.path.splitext(os.path.basename(self._filename))[0]
+
+    @property
+    def data(self):
+        """Returns the data.
+
+        Returns:
+            pandas.DataFrame: the data
+        """
+
+        return self._data
 
     @property
     def filename(self):
@@ -90,51 +89,25 @@ class ExcelWorkbookReader:
 
         return self._filename
 
-    def get_data(self):
-        """Returns the data stored in the workbook. Only the sheet 'Data', 'Gaz du sang' and 'NFS' are considered.
-
-        Returns:
-            pandas.DataFrame: the data
-        """
-
-        data = self.parse_data_worksheet()
-        data = pd.concat([data, self.parse_blood_gas_worksheet()], axis=1)
-        data = pd.concat([data, self.parse_nfs_worksheet()], axis=1)
-
-        return data
-
-    def get_property_slice(self, selected_property, selected_times=None):
+    def get_property_slice(self, selected_property):
         """Return a slice of the data according to a given property and selected times.
 
         Args:
             selected_property (str): the selected property
-            times (list of str): the selected times
 
         Returns:
-            pd.Series: the slice
+            pd.DataFrame: the slice
         """
 
-        data = self.get_data()
-
-        if selected_property not in data.columns:
-            raise UnknownPropertyError('The property {} is unknown'.format(selected_property))
-
-        if selected_times is None:
-            selected_times = data.index
+        if selected_property in self._data.columns:
+            property_slice = self._data[selected_property]
         else:
-            temp = []
-            for s in selected_times:
-                if s not in data.index:
-                    continue
-                temp.append(s)
-            selected_times = pd.Index(temp)
+            property_slice = pd.Series(np.nan, index=self._data.index)
+            logging.warning('Property {} could not be found in {} workbook'.format(selected_property, self._filename))
 
-        if selected_times.empty:
-            raise InvalidTimeError('The selected times are not valid times')
+        property_slice = pd.DataFrame(property_slice.to_numpy(), index=property_slice.index, columns=[self._filename])
 
-        data = data[selected_property].loc[selected_times]
-
-        return data
+        return property_slice
 
     def get_time_slice(self, selected_time):
         """Return a slice of the data according to a given time.
@@ -143,16 +116,16 @@ class ExcelWorkbookReader:
             selected_time (str): the time
 
         Returns:
-            pd.Series: the slice
+            pd.DataFrame: the slice. pandas.DataFrame whose single index is the selected time and columns are the properties of the workbook
         """
 
-        if selected_time not in ExcelWorkbookReader.times:
-            raise InvalidTimeError('The time {} is not a registered time'.format(selected_time))
+        if selected_time in self._data.index:
+            time_slice = pd.DataFrame(self._data.loc[selected_time], columns=[selected_time], index=self._data.columns).T
+        else:
+            time_slice = pd.DataFrame(np.nan, index=[selected_time], columns=self._data.columns)
+            logging.warning('Time {} could not be found in the {} workbook'.format(selected_time, self._filename))
 
-        data = self.get_data()
-        data = data.loc[selected_time]
-
-        return data
+        return time_slice
 
     @ property
     def information(self):
@@ -183,14 +156,42 @@ class ExcelWorkbookReader:
 
         data_sheet = self._workbook.get_sheet_by_name('Gaz du sang')
 
-        properties = [data_sheet.cell(row=row, column=1).value for row in range(6, 31)]
+        times_row = [cell.value for cell in data_sheet[4]]
+        row_indexes = []
+        for i, v in enumerate(times_row):
+            if v is None:
+                continue
+            if v.lower().strip() in ['temps', 'remarque']:
+                continue
+            row_indexes.append(i)
+        first_time = row_indexes[0]
+        last_time = row_indexes[-1]
 
-        cells = data_sheet['B6':'M30']
+        properties_col = [cell.value for cell in data_sheet['A']]
+        col_indexes = []
+        for i, v in enumerate(properties_col):
+            if i < 5:
+                continue
+            if v is None:
+                continue
+            if v.lower().strip() in ['temps', 'remarque']:
+                continue
+            col_indexes.append(i)
+        first_property = col_indexes[0]
+        last_property = col_indexes[-1]
 
-        cells = list(zip(*cells))
+        data_by_rows = tuple(data_sheet.rows)
 
-        data = pd.DataFrame([[cell.value if cell.value is not None else np.nan for cell in row]
-                             for row in cells], columns=properties, index=ExcelWorkbookReader.times)
+        data = []
+        for row in range(first_property, last_property+1):
+            columns = []
+            for col in range(first_time, last_time+1):
+                value = data_by_rows[row][col].value
+                columns.append(float(value) if value is not None else np.nan)
+            data.append(columns)
+
+        data = list(zip(*data))
+        data = pd.DataFrame(data, columns=properties_col[first_property:last_property+1], index=times_row[first_time:last_time+1])
 
         return data
 
@@ -203,12 +204,33 @@ class ExcelWorkbookReader:
 
         data_sheet = self._workbook.get_sheet_by_name('Data')
 
-        properties = [data_sheet.cell(row=6, column=col).value for col in range(3, 22)]
+        time_column = [cell.value for cell in data_sheet['A']]
+        row_indexes = [i for i, v in enumerate(time_column) if v is not None]
+        first_time = row_indexes[0]
+        last_time = row_indexes[-1]
 
-        cells = data_sheet['C7':'U18']
+        properties_row = [cell.value for cell in data_sheet[6]]
+        col_indexes = []
+        for i, v in enumerate(properties_row):
+            if v is None:
+                continue
+            if v.lower().strip() in ['temps', 'remarque']:
+                continue
+            col_indexes.append(i)
+        first_property = col_indexes[0]
+        last_property = col_indexes[-1]
 
-        data = pd.DataFrame([[cell.value if cell.value is not None else np.nan for cell in row]
-                             for row in cells], columns=properties, index=ExcelWorkbookReader.times)
+        data_by_rows = tuple(data_sheet.rows)
+
+        data = []
+        for row in range(first_time, last_time+1):
+            columns = []
+            for col in range(first_property, last_property+1):
+                value = data_by_rows[row][col].value
+                columns.append(float(value) if value is not None else np.nan)
+            data.append(columns)
+
+        data = pd.DataFrame(data, columns=properties_row[first_property:last_property+1], index=time_column[first_time:last_time+1])
 
         return data
 
@@ -221,30 +243,40 @@ class ExcelWorkbookReader:
 
         data_sheet = self._workbook.get_sheet_by_name('NFS')
 
-        properties = [data_sheet.cell(row=row, column=3).value for row in range(3, 17)]
+        times_row = [cell.value for cell in data_sheet[2]]
+        row_indexes = []
+        for i, v in enumerate(times_row):
+            if v is None:
+                continue
+            if v.lower().strip() in ['temps', 'remarque']:
+                continue
+            row_indexes.append(i)
+        first_time = row_indexes[0]
+        last_time = row_indexes[-1]
 
-        cells = data_sheet['D3':'M16']
+        properties_col = [cell.value for cell in data_sheet['C']]
+        col_indexes = []
+        for i, v in enumerate(properties_col):
+            if v is None:
+                continue
+            if v.lower().strip() in ['temps', 'remarque']:
+                continue
+            col_indexes.append(i)
+        first_property = col_indexes[0]
+        last_property = col_indexes[-1]
 
-        data = collections.OrderedDict()
-
-        selected_times = [0, 1, 5, 8, 11]
-        selected_values = [0, 2, 4, 6, 8]
+        data_by_rows = tuple(data_sheet.rows)
 
         data = []
-        for row, _ in enumerate(properties):
+        for row in range(first_property, last_property+1):
+            columns = []
+            for col in range(first_time, last_time+1):
+                value = data_by_rows[row][col].value
+                columns.append(float(value) if value is not None else np.nan)
+            data.append(columns)
 
-            values = [cell.value for cell in cells[row]]
-
-            row = [np.nan]*len(self.times)
-
-            for i in range(len(selected_values)):
-                row[selected_times[i]] = values[selected_values[i]]
-
-            data.append(row)
-
-        data = pd.DataFrame(data, index=properties, columns=ExcelWorkbookReader.times).T
-        data.columns = properties
-        data.set_index(pd.Series(ExcelWorkbookReader.times), inplace=True)
+        data = list(zip(*data))
+        data = pd.DataFrame(data, columns=properties_col[first_property:last_property+1], index=times_row[first_time:last_time+1])
 
         return data
 
@@ -257,14 +289,8 @@ if __name__ == '__main__':
 
     print(mwb.information)
 
-    print(mwb.parse_data_worksheet())
-
-    print(mwb.parse_blood_gas_worksheet())
-
-    print(mwb.parse_nfs_worksheet())
-
-    print(mwb.get_data())
+    print(mwb.data)
 
     print(mwb.get_property_slice('FC'))
 
-    print(mwb.get_time_slice('T0'))
+    print(mwb.get_time_slice('0h00'))

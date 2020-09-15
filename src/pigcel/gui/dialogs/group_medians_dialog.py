@@ -7,6 +7,9 @@ from PyQt5 import QtCore, QtWidgets
 import matplotlib.ticker as ticker
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.dates import DateFormatter
+
+from pigcel.kernel.utils.time_io import add_time
 
 
 class GroupMediansDialog(QtWidgets.QDialog):
@@ -85,6 +88,9 @@ class GroupMediansDialog(QtWidgets.QDialog):
         group = selected_group_model.item(row, 0).data(QtCore.Qt.DisplayRole)
 
         data = self._data_per_group[group]
+
+        data.sort_index(inplace=True)
+
         nan_filtered_data = [[v for v in row if not np.isnan(v)] for _, row in data.iterrows()]
 
         self._figure.clear()

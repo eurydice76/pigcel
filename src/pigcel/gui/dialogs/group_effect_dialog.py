@@ -96,10 +96,10 @@ class GroupEffectDialog(QtWidgets.QDialog):
         self._pairwise_effect_tableview = CopyPastableTableView()
 
         self._selected_group_1 = QtWidgets.QComboBox()
-        self._selected_group_1.addItems(self._pairwise_effect['T-30'].columns)
+        self._selected_group_1.addItems(self._pairwise_effect['-0h30'].columns)
 
         self._selected_group_2 = QtWidgets.QComboBox()
-        self._selected_group_2.addItems(self._pairwise_effect['T-30'].columns)
+        self._selected_group_2.addItems(self._pairwise_effect['-0h30'].columns)
 
         self._plot_button = QtWidgets.QPushButton('Plot')
 

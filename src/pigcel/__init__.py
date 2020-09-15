@@ -6,8 +6,12 @@ The application works with Excel spreadsheets which gather in several sheets the
 """
 
 import logging
+import warnings
 
 import numpy as np
+
+warnings.filterwarnings('ignore')
+
 np.seterr(all='call')
 
 

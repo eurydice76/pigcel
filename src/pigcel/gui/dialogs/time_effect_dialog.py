@@ -13,6 +13,7 @@ from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 
 from pigcel.gui.models.pvalues_data_model import PValuesDataModel
+from pigcel.gui.models.valid_times_model import ValidTimesModel
 from pigcel.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
 from pigcel.gui.views.copy_pastable_tableview import CopyPastableTableView
 
@@ -23,7 +24,7 @@ class TimeEffectDialog(QtWidgets.QDialog):
     statistical test and the group-pairwise p values resulting from the Dunn test.
     """
 
-    def __init__(self, selected_property, global_effect, pairwise_effect,  parent=None):
+    def __init__(self, selected_property, global_effect, pairwise_effect, times_per_group, parent=None):
         """
         """
 
@@ -35,13 +36,16 @@ class TimeEffectDialog(QtWidgets.QDialog):
 
         self._pairwise_effect = pairwise_effect
 
+        self._times_per_group = times_per_group
+
         self.init_ui()
 
     def build_events(self):
         """Build the signal/slots
         """
 
-        self._selected_group.currentIndexChanged.connect(self.on_select_group)
+        self._global_effect_tableview.selectionModel().selectionChanged.connect(self.on_select_group)
+        self._selected_group.currentIndexChanged.connect(self.on_select_pairwise_effect)
         self._pairwise_effect_tableview.customContextMenuRequested.connect(self.on_show_pairwise_effect_table_menu)
 
     def build_layout(self):
@@ -50,8 +54,9 @@ class TimeEffectDialog(QtWidgets.QDialog):
 
         main_layout = QtWidgets.QVBoxLayout()
 
-        global_effect_groupbox_layout = QtWidgets.QVBoxLayout()
+        global_effect_groupbox_layout = QtWidgets.QHBoxLayout()
         global_effect_groupbox_layout.addWidget(self._global_effect_tableview)
+        global_effect_groupbox_layout.addWidget(self._valid_times_listview)
         self._global_effect_groupbox.setLayout(global_effect_groupbox_layout)
         main_layout.addWidget(self._global_effect_groupbox)
 
@@ -74,10 +79,13 @@ class TimeEffectDialog(QtWidgets.QDialog):
         self._global_effect_groupbox = QtWidgets.QGroupBox('Global effect')
 
         self._global_effect_tableview = CopyPastableTableView()
+        self._global_effect_tableview.setSelectionMode(QtWidgets.QTableView.SingleSelection)
         model = PValuesDataModel(self._global_effect, self)
         self._global_effect_tableview.setModel(model)
         for col in range(model.columnCount()):
             self._global_effect_tableview.horizontalHeader().setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+
+        self._valid_times_listview = QtWidgets.QListView()
 
         self._pairwise_effect_groupbox = QtWidgets.QGroupBox('Pairwise effect')
 
@@ -97,9 +105,24 @@ class TimeEffectDialog(QtWidgets.QDialog):
 
         self.build_events()
 
-        self.on_select_group(0)
+        self.on_select_pairwise_effect(0)
 
-    def on_select_group(self, index):
+    def on_select_group(self, indexes):
+        """Event handler called when the user select a different group from the global effect group table view.
+
+        Args:
+            indexes (PyQt5.QtCore.QItemSelection): the selected indexes
+        """
+
+        selected_row = [index.row() for index in indexes.indexes()][0]
+
+        group = self._global_effect_tableview.model().headerData(selected_row, QtCore.Qt.Vertical, QtCore.Qt.DisplayRole)
+
+        valid_times_model = ValidTimesModel(self._times_per_group[group], self)
+
+        self._valid_times_listview.setModel(valid_times_model)
+
+    def on_select_pairwise_effect(self, index):
         """Event handler called when the user select a different group from the group selection combo box.
 
         Args:

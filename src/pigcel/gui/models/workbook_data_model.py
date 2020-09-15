@@ -6,22 +6,20 @@ from PyQt5 import QtCore, QtGui
 
 import numpy as np
 
-from pigcel.kernel.readers.excel_reader import ExcelWorkbookReader
-
 
 class WorkbookDataModel(QtCore.QAbstractTableModel):
     """This class implements a model for storing the data of a monitoring workbook. 
     """
 
-    def __init__(self, data):
+    def __init__(self, dataframe):
         """Constructor.
 
         Args:
-            data (collections.OrderedDict): the data
+            dataframe (pandas.DataFrame): the data
         """
 
         super(WorkbookDataModel, self).__init__()
-        self._data = data
+        self._dataframe = dataframe
 
     def rowCount(self, parent=None):
         """Return the number of rows of the model.
@@ -30,7 +28,7 @@ class WorkbookDataModel(QtCore.QAbstractTableModel):
             int: the number of rows
         """
 
-        return len(ExcelWorkbookReader.times)
+        return len(self._dataframe.index)
 
     def columnCount(self, parent=None):
         """Return the number of columns of the model.
@@ -39,7 +37,7 @@ class WorkbookDataModel(QtCore.QAbstractTableModel):
             int: the number of columns
         """
 
-        return len(self._data.columns)
+        return len(self._dataframe.columns)
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
         """Return the data for a given index and for a given role.
@@ -55,10 +53,7 @@ class WorkbookDataModel(QtCore.QAbstractTableModel):
         if not index.isValid():
             return QtCore.QVariant()
 
-        properties = list(self._data.keys())
-        prop = properties[index.column()]
-        values = self._data[prop]
-        value = values[index.row()]
+        value = self._dataframe.iloc[index.row(), index.column()]
 
         if role == QtCore.Qt.DisplayRole:
             return str(value)
@@ -81,8 +76,8 @@ class WorkbookDataModel(QtCore.QAbstractTableModel):
 
         if role == QtCore.Qt.DisplayRole:
             if orientation == QtCore.Qt.Horizontal:
-                properties = list(self._data.keys())
+                properties = self._dataframe.columns
                 return properties[index]
             else:
-                times = ExcelWorkbookReader.times
+                times = self._dataframe.index
                 return times[index]
