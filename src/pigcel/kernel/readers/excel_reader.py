@@ -37,8 +37,6 @@ class ExcelWorkbookReader:
     'Suivi', 'Data', 'Gaz du sang' and 'NFS' sheets.
     """
 
-    times = ['T-30', 'T0', 'T10', 'T20', 'T30', 'T1H', 'T1H30', 'T2H', 'T3H', 'T4H', 'T5H', 'T6H']
-
     def __init__(self, filename):
         """Constructor
 
