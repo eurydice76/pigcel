@@ -10,10 +10,15 @@ import sys
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+import numpy as np
+
+import openpyxl
+
 import pigcel
 from pigcel.__pkginfo__ import __version__
 from pigcel.gui.models.animals_data_model import AnimalsDataModel
 from pigcel.gui.models.workbook_data_model import WorkbookDataModel
+from pigcel.gui.models.animals_groups_model import AnimalsGroupsModel
 from pigcel.gui.views.animals_data_listview import AnimalsDataListView
 from pigcel.gui.views.copy_pastable_tableview import CopyPastableTableView
 from pigcel.gui.widgets.logger_widget import QTextEditLogger
@@ -156,11 +161,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         statistics_menu = menubar.addMenu('&Statistics')
 
-        group_effect_action = QtWidgets.QAction('&Group effect', self)
+        group_effect_menu = statistics_menu.addMenu('&Groups effect')
+
+        group_effect_action = QtWidgets.QAction('&Compute', self)
         group_effect_action.setShortcut('Ctrl+G')
         group_effect_action.setStatusTip('Display group effect statistics')
         group_effect_action.triggered.connect(self.on_display_group_effect_statistics)
-        statistics_menu.addAction(group_effect_action)
+        group_effect_menu.addAction(group_effect_action)
+
+        export_all_group_effects_action = QtWidgets.QAction('&Export all', self)
+        export_all_group_effects_action.setShortcut('Ctrl+B')
+        export_all_group_effects_action.setStatusTip('Export group effects for all properties')
+        export_all_group_effects_action.triggered.connect(self.on_export_all_group_effects)
+        group_effect_menu.addAction(export_all_group_effects_action)
 
         time_effect_action = QtWidgets.QAction('&Time effect', self)
         time_effect_action.setShortcut('Ctrl+T')
@@ -268,6 +281,84 @@ class MainWindow(QtWidgets.QMainWindow):
         """
 
         self.display_group_medians.emit()
+
+    def on_export_all_group_effects(self):
+        """Export hte group effect computed for all properties.
+        """
+
+        all_properties = [self._selected_property_combo.itemText(index) for index in range(self._selected_property_combo.count())]
+        if not all_properties:
+            logging.info('No properties loaded')
+            return
+
+        groups_model = self._groups_widget.model()
+        if groups_model is None:
+            logging.info('No groups defined')
+            return
+
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption='Export statistics as ...', filter="Excel files (*.xls *.xlsx)")
+        if not filename:
+            return
+
+        filename_noext, ext = os.path.splitext(filename)
+        if ext not in ['.xls', '.xlsx']:
+            logging.warning('Bad file extension for output excel file {}. It will be replaced by ".xlsx"'.format(filename))
+            filename = filename_noext + '.xlsx'
+
+        workbook = openpyxl.Workbook()
+        # Remove the first empty sheet created by default
+        workbook.remove_sheet(workbook.get_sheet_by_name('Sheet'))
+
+        progress_bar.reset(len(all_properties))
+
+        n_groups = groups_model.rowCount()
+
+        for i, selected_property in enumerate(all_properties):
+
+            # Create the excel worksheet for the selected property
+            worksheet = workbook.create_sheet(selected_property)
+
+            # Write the descriptive statisitics block.
+            for r in range(n_groups):
+                group_name = groups_model.data(groups_model.index(r, 0), QtCore.Qt.DisplayRole)
+                worksheet.cell(1, 8*r+2).value = group_name
+                animals_pool_model = groups_model.data(groups_model.index(r, 0), AnimalsGroupsModel.AnimalsPoolModel)
+                reduced_data = animals_pool_model.get_reduced_data(selected_property)
+                for col, col_name in enumerate(reduced_data.columns):
+                    worksheet.cell(2, 8*r+col+2).value = col_name
+                    for row, row_name in enumerate(reduced_data.index):
+                        worksheet.cell(2+row+1, 1).value = row_name
+                        worksheet.cell(2+row+1, 8*r+col+2).value = reduced_data.loc[row_name, col_name]
+
+            # Write the dunn test block.
+            pairwise_group_effect = groups_model.evaluate_pairwise_group_effect(selected_property)
+            for r in range(n_groups):
+                group_name = groups_model.data(groups_model.index(r, 0), QtCore.Qt.DisplayRole)
+                worksheet.cell(1, 2+(8+r)*n_groups).value = group_name
+                for rr in range(n_groups):
+                    group_name_1 = groups_model.data(groups_model.index(rr, 0), QtCore.Qt.DisplayRole)
+                    worksheet.cell(2, 2+(8+r)*n_groups+rr).value = group_name_1
+
+            for ind, group_effect in enumerate(pairwise_group_effect.values()):
+                comp = 0
+                for col, col_name in enumerate(group_effect.columns):
+                    for row, row_name in enumerate(group_effect.index):
+                        val = 'nan' if np.isnan(group_effect.loc[row_name, col_name]) else group_effect.loc[row_name, col_name]
+                        worksheet.cell(2+ind+1, 2+8*n_groups+comp).value = val
+                        comp += 1
+
+            for r in range(n_groups):
+                worksheet.merge_cells(start_row=1, start_column=8*r+2, end_row=1, end_column=8*(r+1)+1)
+                worksheet.merge_cells(start_row=1, start_column=(8+r)*n_groups+2, end_row=1, end_column=(8+r+1)*n_groups+1)
+                print((8+r)*n_groups+2, (8+r+1)*n_groups+1)
+
+            progress_bar.update(i+1)
+
+        try:
+            workbook.save(filename)
+        except PermissionError as error:
+            logging.error(str(error))
+            return
 
     def on_export_group_statistics(self):
         """Event fired when the user clicks on the 'Export statistics' menu button.
@@ -466,7 +557,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.on_update_time_plot()
 
-    @property
+    @ property
     def selected_property(self):
 
         return self._selected_property_combo.currentText()

@@ -96,6 +96,12 @@ class GroupsWidget(QtWidgets.QWidget):
 
         self.build_events()
 
+    def model(self):
+        """Returns the groups model underlying this widget.
+        """
+
+        return self._groups_list.model()
+
     def on_add_group(self, group):
         """Event fired when a new group is added to the group list.
         """

@@ -56,6 +56,7 @@ class ExcelWorkbookReader:
         self._data = self.parse_data_worksheet()
         self._data = pd.concat([self._data, self.parse_blood_gas_worksheet()], axis=1)
         self._data = pd.concat([self._data, self.parse_nfs_worksheet()], axis=1)
+        self._data = self._data.reindex(sorted(self._data.columns), axis=1)
 
     @property
     def basename(self):
@@ -289,6 +290,6 @@ if __name__ == '__main__':
 
     print(mwb.data)
 
-    print(mwb.get_property_slice('FC'))
+    print(mwb.get_property_slice('AchE'))
 
     print(mwb.get_time_slice('0h00'))
