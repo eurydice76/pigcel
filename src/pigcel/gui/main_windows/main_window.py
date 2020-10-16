@@ -350,7 +350,6 @@ class MainWindow(QtWidgets.QMainWindow):
             for r in range(n_groups):
                 worksheet.merge_cells(start_row=1, start_column=8*r+2, end_row=1, end_column=8*(r+1)+1)
                 worksheet.merge_cells(start_row=1, start_column=(8+r)*n_groups+2, end_row=1, end_column=(8+r+1)*n_groups+1)
-                print((8+r)*n_groups+2, (8+r+1)*n_groups+1)
 
             progress_bar.update(i+1)
 
