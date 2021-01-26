@@ -100,25 +100,23 @@ class GroupAveragesDialog(QtWidgets.QDialog):
         x_axis_format = DateFormatter('%Hh%M')
         self._axes.xaxis.set_major_formatter(x_axis_format)
 
-        all_dates = set()
-        real_times = set()
         for group in selected_groups:
 
-            times = [add_time(t, 30) for t in self._reduced_data_per_group[group]['mean'].index]
-            dates = [datetime.datetime.strptime(t, '%Hh%M') for t in times]
-
-            all_dates.update(dates)
-            real_times.update(self._reduced_data_per_group[group]['mean'].index)
+            times = self._reduced_data_per_group[group]['mean'].index
 
             y = self._reduced_data_per_group[group]['mean']
             yerr = self._reduced_data_per_group[group]['std']
 
-            self._axes.errorbar(dates, y, yerr=yerr, fmt='o')
+            self._axes.errorbar(times, y, yerr=yerr, fmt='o')
 
         group_names = selected_groups
 
-        self._axes.set_xticks(sorted(all_dates))
-        self._axes.set_xticklabels(sorted(real_times), rotation=25)
+        # self._axes.set_xticks(sorted(all_dates))
+        self._axes.set_xticklabels(times, rotation=25)
+
+        for tick in self._axes.xaxis.get_major_ticks():
+            tick.label.set_fontsize(8)
+            tick.label.set_rotation('vertical')
 
         self._axes.legend(group_names)
 

@@ -102,4 +102,8 @@ class GroupMediansDialog(QtWidgets.QDialog):
 
         self._axes.set_xticklabels(data.index)
 
+        for tick in self._axes.xaxis.get_major_ticks():
+            tick.label.set_fontsize(8)
+            tick.label.set_rotation('vertical')
+
         self._canvas.draw()

@@ -16,7 +16,6 @@ import pandas as pd
 
 import numpy as np
 
-
 class InvalidExcelWorkbookError(Exception):
     """This class implements an exception raised when the workbook is invalid.
     """
@@ -36,6 +35,8 @@ class ExcelWorkbookReader:
     """This class implements the reader for the data stored in excel file. To be valid the excel file must contain respectively
     'Suivi', 'Data', 'Gaz du sang' and 'NFS' sheets.
     """
+
+    times = set(['-0h30', '0h00', '0h10', '0h20', '0h30', '1h00', '1h30', '2h00', '3h00', '4h00', '5h00', '6h00'])
 
     def __init__(self, filename):
         """Constructor
@@ -57,6 +58,10 @@ class ExcelWorkbookReader:
         self._data = pd.concat([self._data, self.parse_blood_gas_worksheet()], axis=1)
         self._data = pd.concat([self._data, self.parse_nfs_worksheet()], axis=1)
         self._data = self._data.reindex(sorted(self._data.columns), axis=1)
+
+        if set(self._data.index) != ExcelWorkbookReader.times:
+            raise InvalidExcelWorkbookError('Times not properly defined in filename {filename}.')
+
 
     @property
     def basename(self):
