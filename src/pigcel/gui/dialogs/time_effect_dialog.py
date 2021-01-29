@@ -76,7 +76,7 @@ class TimeEffectDialog(QtWidgets.QDialog):
 
         self.setWindowTitle('Time effect statistics for {} property'.format(self._selected_property))
 
-        self._global_effect_groupbox = QtWidgets.QGroupBox('Global effect')
+        self._global_effect_groupbox = QtWidgets.QGroupBox('Global effect (Friedman test)')
 
         self._global_effect_tableview = CopyPastableTableView()
         self._global_effect_tableview.setSelectionMode(QtWidgets.QTableView.SingleSelection)
@@ -87,7 +87,7 @@ class TimeEffectDialog(QtWidgets.QDialog):
 
         self._valid_times_listview = QtWidgets.QListView()
 
-        self._pairwise_effect_groupbox = QtWidgets.QGroupBox('Pairwise effect')
+        self._pairwise_effect_groupbox = QtWidgets.QGroupBox('Pairwise effect (Dunn test)')
 
         self._selected_group = QtWidgets.QComboBox()
         self._selected_group.addItems(self._pairwise_effect.keys())

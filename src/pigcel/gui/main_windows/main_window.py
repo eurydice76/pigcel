@@ -13,6 +13,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import numpy as np
 
 import openpyxl
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 import pigcel
 from pigcel.__pkginfo__ import __version__
@@ -318,38 +319,35 @@ class MainWindow(QtWidgets.QMainWindow):
             # Create the excel worksheet for the selected property
             worksheet = workbook.create_sheet(selected_property)
 
-            # Write the descriptive statisitics block.
-            for r in range(n_groups):
-                group_name = groups_model.data(groups_model.index(r, 0), QtCore.Qt.DisplayRole)
-                worksheet.cell(1, 8*r+2).value = group_name
-                animals_pool_model = groups_model.data(groups_model.index(r, 0), AnimalsGroupsModel.AnimalsPoolModel)
-                reduced_data = animals_pool_model.get_reduced_data(selected_property)
-                for col, col_name in enumerate(reduced_data.columns):
-                    worksheet.cell(2, 8*r+col+2).value = col_name
-                    for row, row_name in enumerate(reduced_data.index):
-                        worksheet.cell(2+row+1, 1).value = row_name
-                        worksheet.cell(2+row+1, 8*r+col+2).value = reduced_data.loc[row_name, col_name]
+            global_effect = groups_model.evaluate_global_group_effect(selected_property)
 
-            # Write the dunn test block.
+            for j, col in enumerate(global_effect.columns):
+                worksheet.cell(1,j+2).value = col
+
+            for j, row in enumerate(global_effect.index):
+                worksheet.cell(j+2,1).value = row
+
+            for j in range(len(global_effect.index)):
+                for k in range(len(global_effect.columns)):
+                    val = 'nan' if np.isnan(global_effect.iloc[j,k]).any() else global_effect.iloc[j,k]
+                    worksheet.cell(j+2,k+2).value = val
+
+            current_row = global_effect.shape[0] + 3
+
             pairwise_group_effect = groups_model.evaluate_pairwise_group_effect(selected_property)
-            for r in range(n_groups):
-                group_name = groups_model.data(groups_model.index(r, 0), QtCore.Qt.DisplayRole)
-                worksheet.cell(1, 2+(8+r)*n_groups).value = group_name
-                for rr in range(n_groups):
-                    group_name_1 = groups_model.data(groups_model.index(rr, 0), QtCore.Qt.DisplayRole)
-                    worksheet.cell(2, 2+(8+r)*n_groups+rr).value = group_name_1
 
-            for ind, group_effect in enumerate(pairwise_group_effect.values()):
-                comp = 0
-                for col, col_name in enumerate(group_effect.columns):
-                    for row, row_name in enumerate(group_effect.index):
-                        val = 'nan' if np.isnan(group_effect.loc[row_name, col_name]) else group_effect.loc[row_name, col_name]
-                        worksheet.cell(2+ind+1, 2+8*n_groups+comp).value = val
-                        comp += 1
-
-            for r in range(n_groups):
-                worksheet.merge_cells(start_row=1, start_column=8*r+2, end_row=1, end_column=8*(r+1)+1)
-                worksheet.merge_cells(start_row=1, start_column=(8+r)*n_groups+2, end_row=1, end_column=(8+r+1)*n_groups+1)
+            for j, (time, pairwise_effect) in enumerate(pairwise_group_effect.items()):
+                row = current_row + j*(pairwise_effect.shape[0] + 3)
+                worksheet.cell(row,1).value = 't = {}'.format(time)
+                for k, col_name in enumerate(pairwise_effect.columns):
+                    worksheet.cell(row+1,k+2).value = col_name
+                for k, row_name in enumerate(pairwise_effect.index):
+                    worksheet.cell(row+k+2,1).value = row_name
+                
+                for k in range(len(pairwise_effect.index)):
+                    for l in range(len(pairwise_effect.columns)):
+                        val = 'nan' if np.isnan(pairwise_effect.iloc[k,l]).any() else pairwise_effect.iloc[k,l]
+                        worksheet.cell(row+k+2,l+2).value = val
 
             progress_bar.update(i+1)
 

@@ -139,9 +139,15 @@ class AnimalsGroupsModel(QtCore.QAbstractListModel):
                     except ValueError as error:
                         p_value = np.nan
                         logging.warning(str(error))
-            p_values_per_time.append([len(v) for v in values_per_group] + [p_value])
+            means = [np.nanmean(v) for v in values_per_group]
+            stds = [np.nanstd(v) for v in values_per_group]
+            ns = [len(v) for v in values_per_group]
+            descriptive_statistics = np.ravel(list(zip(means,stds,ns))).tolist()
+ 
+            p_values_per_time.append(descriptive_statistics + [p_value])
 
         group_names = [v[0] for v in selected_groups]
+        group_names = np.ravel([[v]*3 for v in group_names]).tolist()
         columns = group_names + ['p value']
         p_values = pd.DataFrame(p_values_per_time, index=list(data_pooled_per_time.keys()), columns=columns)
 

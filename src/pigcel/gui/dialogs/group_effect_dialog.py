@@ -80,7 +80,7 @@ class GroupEffectDialog(QtWidgets.QDialog):
 
         self.setWindowTitle('Group effect statistics for {} property'.format(self._selected_property))
 
-        self._global_effect_groupbox = QtWidgets.QGroupBox('Global effect')
+        self._global_effect_groupbox = QtWidgets.QGroupBox('Global effect (Mann-Whitney/Kruskal-Wallis test)')
 
         self._global_effect_tableview = CopyPastableTableView()
         model = PValuesDataModel(self._global_effect, self)
@@ -88,7 +88,7 @@ class GroupEffectDialog(QtWidgets.QDialog):
         for col in range(model.columnCount()):
             self._global_effect_tableview.horizontalHeader().setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
 
-        self._pairwise_effect_groupbox = QtWidgets.QGroupBox('Pairwise effect')
+        self._pairwise_effect_groupbox = QtWidgets.QGroupBox('Pairwise effect (Dunn test)')
 
         self._selected_time = QtWidgets.QComboBox()
         self._selected_time.addItems(self._pairwise_effect.keys())

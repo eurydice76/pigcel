@@ -60,7 +60,7 @@ class ExcelWorkbookReader:
         self._data = self._data.reindex(sorted(self._data.columns), axis=1)
 
         if set(self._data.index) != ExcelWorkbookReader.times:
-            raise InvalidExcelWorkbookError('Times not properly defined in filename {filename}.')
+            raise InvalidExcelWorkbookError('Times not properly defined in {}.'.format(filename))
 
 
     @property
