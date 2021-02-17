@@ -44,7 +44,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     display_group_medians = QtCore.pyqtSignal()
 
-    export_group_statistics = QtCore.pyqtSignal()
+    export_group_statistics = QtCore.pyqtSignal(str,str)
 
     import_groups_from_directories = QtCore.pyqtSignal(dict)
 
@@ -160,6 +160,12 @@ class MainWindow(QtWidgets.QMainWindow):
         export_group_statistics.triggered.connect(self.on_export_group_statistics)
         group_menu.addAction(export_group_statistics)
 
+        export_all_group_statistics = QtWidgets.QAction('&Export all descriptive statistics', self)
+        export_all_group_statistics.setShortcut('Ctrl+A')
+        export_all_group_statistics.setStatusTip('Export descriptive statistics (average, std, quartile ...)')
+        export_all_group_statistics.triggered.connect(self.on_export_all_group_statistics)
+        group_menu.addAction(export_all_group_statistics)
+
         statistics_menu = menubar.addMenu('&Statistics')
 
         group_effect_menu = statistics_menu.addMenu('&Groups effect')
@@ -176,11 +182,20 @@ class MainWindow(QtWidgets.QMainWindow):
         export_all_group_effects_action.triggered.connect(self.on_export_all_group_effects)
         group_effect_menu.addAction(export_all_group_effects_action)
 
+        time_effect_menu = statistics_menu.addMenu('&Time effect')
+
         time_effect_action = QtWidgets.QAction('&Time effect', self)
         time_effect_action.setShortcut('Ctrl+T')
         time_effect_action.setStatusTip('Display time effect statistics')
         time_effect_action.triggered.connect(self.on_display_time_effect_statistics)
-        statistics_menu.addAction(time_effect_action)
+        time_effect_menu.addAction(time_effect_action)
+
+        export_all_time_effects_action = QtWidgets.QAction('&Export all', self)
+        export_all_time_effects_action.setShortcut('Ctrl+L')
+        export_all_time_effects_action.setStatusTip('Export time effects for all properties')
+        export_all_time_effects_action.triggered.connect(self.on_export_all_time_effects)
+        time_effect_menu.addAction(export_all_time_effects_action)
+
 
     def build_widgets(self):
         """Build the widgets.
@@ -284,7 +299,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.display_group_medians.emit()
 
     def on_export_all_group_effects(self):
-        """Export hte group effect computed for all properties.
+        """Export the group effect computed for all properties.
         """
 
         all_properties = [self._selected_property_combo.itemText(index) for index in range(self._selected_property_combo.count())]
@@ -354,14 +369,148 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             workbook.save(filename)
         except PermissionError as error:
-            logging.error(str(error))
+            logging.error('Can not save {} notebook: {}'.format(filename, str(error)))
             return
+
+    def on_export_all_time_effects(self):
+        """Export the group effect computed for all properties.
+        """
+
+        all_properties = [self._selected_property_combo.itemText(index) for index in range(self._selected_property_combo.count())]
+        if not all_properties:
+            logging.info('No properties loaded')
+            return
+
+        groups_model = self._groups_widget.model()
+        if groups_model is None:
+            logging.info('No groups defined')
+            return
+
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption='Export statistics as ...', filter="Excel files (*.xls *.xlsx)")
+        if not filename:
+            return
+
+        filename_noext, ext = os.path.splitext(filename)
+        if ext not in ['.xls', '.xlsx']:
+            logging.warning('Bad file extension for output excel file {}. It will be replaced by ".xlsx"'.format(filename))
+            filename = filename_noext + '.xlsx'
+
+        workbook = openpyxl.Workbook()
+        # Remove the first empty sheet created by default
+        workbook.remove_sheet(workbook.get_sheet_by_name('Sheet'))
+
+        progress_bar.reset(len(all_properties))
+
+        # n_groups = groups_model.rowCount()
+
+        for i, selected_property in enumerate(all_properties):
+
+            # Create the excel worksheet for the selected property
+            worksheet = workbook.create_sheet(selected_property)
+
+            # Compute the global time effect for the running property
+            times_per_group, global_effect = groups_model.evaluate_global_time_effect(selected_property)
+
+            # Compute the pairwise time effect for the running property
+            pairwise_effect = groups_model.evaluate_pairwise_time_effect(selected_property)
+
+            # Loop over the groups and write the data per block
+            # A block is made of:
+            #   1st line: the name of the group
+            #   2nd line: the list of valid times (time for which the pairwise effect could be computed)
+            #   3rd line: the p value for the global effect
+            # Then the p-value 12x12 matrix for the pairwise effect (all times included from -0h30 to 6h00)
+            comp = 0
+            for j, (group,pairwise_effect) in enumerate(pairwise_effect.items()):
+
+                comp += 1
+
+                worksheet.cell(comp,1).value = 'Group'
+                worksheet.cell(comp,2).value = group
+
+                comp += 1
+
+                # These are the times for which the time effect could be computed
+                valid_times = [time[0] for time in times_per_group[group] if time[1]]
+
+                worksheet.cell(comp,1).value = 'Valid times'
+                for k, valid_time in enumerate(valid_times):
+                    worksheet.cell(comp,k+2).value = valid_time
+
+                comp += 1
+                worksheet.cell(comp,1).value = 'p-value'
+                worksheet.cell(comp,2).value = global_effect.loc[group,'p-value']
+
+                comp += 2
+
+                for k, time in enumerate(pairwise_effect.columns):
+                    worksheet.cell(comp,k+2).value = time
+
+                for k, time in enumerate(pairwise_effect.index):
+                    comp += 1
+                    worksheet.cell(comp,1).value = time
+                    for l in range(len(pairwise_effect.columns)):
+                        val = 'nan' if np.isnan(pairwise_effect.iloc[k,l]).any() else pairwise_effect.iloc[k,l]
+                        worksheet.cell(comp,l+2).value = val
+
+                comp += 2
+
+            progress_bar.update(i+1)
+
+        try:
+            workbook.save(filename)
+        except PermissionError as error:
+            logging.error('Can not save {} notebook: {}'.format(filename, str(error)))
+            return
+
+    def _export_descriptive_statistics(self, selected_property, filename):
+        """
+        """
+
+        self.export_group_statistics.emit(selected_property, filename)
+
+    def on_export_all_group_statistics(self):
+        """Event fired when the user clicks on the 'Export all descriptive statistics' menu button
+        """
+
+        selected_directory = QtWidgets.QFileDialog.getExistingDirectory(self, "Select Directory")
+        if not selected_directory:
+            return
+
+        # Check that the selected directory is writable
+        try:
+            test_file = os.path.join(selected_directory,'xxx')
+            fout = open(test_file,'w')
+        except IOError as e:
+            logging.error(str(e))
+            return
+        else:
+            fout.close()
+            os.remove(test_file)
+
+        all_properties = [self._selected_property_combo.itemText(i) for i in range(self._selected_property_combo.count())]
+
+        progress_bar.reset(len(all_properties))
+
+        for i, prop in enumerate(all_properties):
+            filename = os.path.join(selected_directory,'{}.xlsx'.format(prop))
+            self._export_descriptive_statistics(prop, filename)
+            progress_bar.update(i+1)
 
     def on_export_group_statistics(self):
         """Event fired when the user clicks on the 'Export statistics' menu button.
         """
 
-        self.export_group_statistics.emit()
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption='Export statistics as ...', filter="Excel files (*.xls *.xlsx)")
+        if not filename:
+            return
+
+        filename_noext, ext = os.path.splitext(filename)
+        if ext not in ['.xls', '.xlsx']:
+            logging.warning('Bad file extension for output excel file {}. It will be replaced by ".xlsx"'.format(filename))
+            filename = filename_noext + '.xlsx'
+
+        self._export_descriptive_statistics(self.selected_property, filename)
 
     def on_import_groups_from_directories(self):
         """Event fired when the user clicks on Groups -> Import from directories menu button.
@@ -397,7 +546,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 try:
                     reader = ExcelWorkbookReader(data_file)
                 except Exception as error:
-                    logging.error(str(error))
+                    logging.error('Error reading {} file: {}'.format(data_file, str(error)))
                     continue
                 else:
                     animals_data_model.add_workbook(reader)
@@ -449,7 +598,7 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 reader = ExcelWorkbookReader(xlsx_file)
             except Exception as error:
-                logging.error(str(error))
+                logging.error('Error reading {} file: {}'.format(xlsx_file, str(error)))
                 continue
             else:
                 workbooks_model.add_workbook(reader)
@@ -526,7 +675,10 @@ class MainWindow(QtWidgets.QMainWindow):
         selected_data = []
         for wb in selected_workbooks:
             time_slice = wb.get_time_slice(selected_time)
-            value = time_slice[selected_property].loc[selected_time]
+            if selected_property not in time_slice.columns:
+                value = np.nan
+            else:
+                value = time_slice[selected_property].loc[selected_time]
             selected_data.append((wb.basename, value))
         selected_data = (selected_property, selected_time, selected_data)
 

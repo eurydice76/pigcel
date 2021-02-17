@@ -47,12 +47,20 @@ class ExcelWorkbookReader:
 
         self._workbook = openpyxl.load_workbook(filename, data_only=True)
 
+        self._filename = filename
+
         sheet_names = set(self._workbook.get_sheet_names())
 
-        if len(sheet_names.intersection(['Suivi', 'Data', 'Gaz du sang', 'NFS'])) != 4:
-            raise InvalidExcelWorkbookError('One or more compulsory sheets are missing.')
+        for sheet_name in sheet_names:
+            ss_sheet = self._workbook[sheet_name]
+            # You have to proceed in two steps to change the sheet title as it it case insensitive
+            ss_sheet.title = sheet_name.lower().strip() + '1'
+            ss_sheet.title = sheet_name.lower().strip()
 
-        self._filename = filename
+        sheet_names = set(self._workbook.get_sheet_names())
+        
+        if len(sheet_names.intersection(['suivi', 'data', 'gaz du sang', 'nfs'])) != 4:
+            raise InvalidExcelWorkbookError('One or more compulsory sheets are missing in {} file.'.format(self._filename))
 
         self._data = self.parse_data_worksheet()
         self._data = pd.concat([self._data, self.parse_blood_gas_worksheet()], axis=1)
@@ -139,7 +147,7 @@ class ExcelWorkbookReader:
             str: the general information about the animal
         """
 
-        data_sheet = self._workbook.get_sheet_by_name('Suivi')
+        data_sheet = self._workbook.get_sheet_by_name('suivi')
 
         cells = data_sheet['A1':'B13']
 
@@ -158,7 +166,7 @@ class ExcelWorkbookReader:
             collections.OrderedDict: the data
         """
 
-        data_sheet = self._workbook.get_sheet_by_name('Gaz du sang')
+        data_sheet = self._workbook['gaz du sang']
 
         times_row = [cell.value for cell in data_sheet[4]]
         row_indexes = []
@@ -172,6 +180,7 @@ class ExcelWorkbookReader:
         last_time = row_indexes[-1]
 
         properties_col = [cell.value for cell in data_sheet['A']]
+        properties_col = [v.lower().strip() if v is not None else v for v in properties_col]
         col_indexes = []
         for i, v in enumerate(properties_col):
             if i < 5:
@@ -206,7 +215,7 @@ class ExcelWorkbookReader:
             collections.OrderedDict: the data
         """
 
-        data_sheet = self._workbook.get_sheet_by_name('Data')
+        data_sheet = self._workbook.get_sheet_by_name('data')
 
         time_column = [cell.value for cell in data_sheet['A']]
         row_indexes = [i for i, v in enumerate(time_column) if v is not None]
@@ -214,6 +223,7 @@ class ExcelWorkbookReader:
         last_time = row_indexes[-1]
 
         properties_row = [cell.value for cell in data_sheet[6]]
+        properties_row = [v.lower().strip() if v is not None else v for v in properties_row]
         col_indexes = []
         for i, v in enumerate(properties_row):
             if v is None:
@@ -245,7 +255,7 @@ class ExcelWorkbookReader:
             collections.OrderedDict: the data
         """
 
-        data_sheet = self._workbook.get_sheet_by_name('NFS')
+        data_sheet = self._workbook.get_sheet_by_name('nfs')
 
         times_row = [cell.value for cell in data_sheet[2]]
         row_indexes = []
@@ -259,6 +269,7 @@ class ExcelWorkbookReader:
         last_time = row_indexes[-1]
 
         properties_col = [cell.value for cell in data_sheet['C']]
+        properties_col = [v.lower().strip() if v is not None else v for v in properties_col]
         col_indexes = []
         for i, v in enumerate(properties_col):
             if v is None:

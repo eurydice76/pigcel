@@ -220,7 +220,7 @@ class GroupsWidget(QtWidgets.QWidget):
         dialog = TimeEffectDialog(selected_property, global_effect, pairwise_effect, times_per_group, self)
         dialog.show()
 
-    def on_export_group_statistics(self):
+    def on_export_group_statistics(self, selected_property, filename):
         """Event fired when the user clicks on the 'Export statistics' menu button.
         """
 
@@ -236,16 +236,7 @@ class GroupsWidget(QtWidgets.QWidget):
             logging.warning('No group defined yet')
             return
 
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption='Export statistics as ...', filter="Excel files (*.xls *.xlsx)")
-        if not filename:
-            return
-
-        filename_noext, ext = os.path.splitext(filename)
-        if ext not in ['.xls', '.xlsx']:
-            logging.warning('Bad file extension for output excel file {}. It will be replaced by ".xlsx"'.format(filename))
-            filename = filename_noext + '.xlsx'
-
-        groups_model.export_statistics(filename, selected_property=self._main_window.selected_property)
+        groups_model.export_statistics(filename, selected_property=selected_property)
 
     def on_import_groups(self, groups):
         """Event fired when the user click on Groups -> Import from directories menu button.
