@@ -1,3 +1,10 @@
+version 0.0.4
+--------------
+* ADDED    export all for time effect
+* ADDED    export all for descriptive statistics
+* UPDATED  the property are now treated in lower case
+* UPDATED  the excel sheet name are now treated in lower case
+
 version 0.0.3
 --------------
 * FIXED:   various fixes
