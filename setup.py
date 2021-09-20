@@ -25,4 +25,4 @@ setup(name="pigcel",
       include_package_data=True,
       package_dir={'': 'src'},
       platforms=['Unix', 'Windows'],
-      entry_points={'gui_scripts': ['pigcel = pigcel.scripts.run_pigcel:main']})
+      scripts=scripts)
